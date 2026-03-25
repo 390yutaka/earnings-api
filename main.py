@@ -107,7 +107,7 @@ async def get_day(date_str: str):
 @app.get("/api/stophigh/today")
 async def get_stophigh_today():
     """株探から本日のストップ高銘柄を取得"""
-    url = "https://kabutan.jp/warning/?mode=1_1"
+    url = "https://kabutan.jp/warning/?mode=3_1"
     async with httpx.AsyncClient(headers=HEADERS, timeout=15) as client:
         r = await client.get(url)
         r.raise_for_status()
@@ -115,7 +115,7 @@ async def get_stophigh_today():
     soup = BeautifulSoup(r.text, "html.parser")
     results = []
 
-    for row in soup.select("table.stock_table tr"):
+    for row in soup.select("table tr"):
         cols = row.find_all("td")
         if len(cols) < 4:
             continue
@@ -171,11 +171,11 @@ async def get_stophigh_after_earnings(days: int = 30):
             # 株探のストップ高ページから翌日のストップ高銘柄リストを取得
             next_str = next_d.strftime("%Y%m%d")
             try:
-                sh_url = f"https://kabutan.jp/stock/stop?market=1&type=1&date={next_str}"
+                sh_url = f"https://kabutan.jp/warning/?mode=3_1&date={next_str}"
                 sr = await client.get(sh_url)
                 sh_soup = BeautifulSoup(sr.text, "html.parser")
                 sh_tickers = set()
-                for row in sh_soup.select("table.stock_table tr"):
+                for row in sh_soup.select("table tr"):
                     cols = row.find_all("td")
                     if not cols:
                         continue
