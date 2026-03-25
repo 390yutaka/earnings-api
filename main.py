@@ -119,17 +119,19 @@ async def get_stophigh_today():
         cols = row.find_all("td")
         if len(cols) < 4:
             continue
-        # コード
+        # 銘柄コードとnameは同じセルにある
         code_el = cols[0].find("a")
         if not code_el:
             continue
         ticker = re.sub(r"\D", "", code_el.get_text())
         if not re.match(r"^\d{4}$", ticker):
             continue
-        name      = cols[1].get_text(strip=True) if len(cols) > 1 else ""
-        price     = cols[2].get_text(strip=True) if len(cols) > 2 else ""
-        change    = cols[3].get_text(strip=True) if len(cols) > 3 else ""
-        volume    = cols[4].get_text(strip=True) if len(cols) > 4 else ""
+        # 企業名は2番目のaタグから取得
+        links = cols[0].find_all("a")
+        name = links[1].get_text(strip=True) if len(links) > 1 else cols[1].get_text(strip=True)
+        price  = cols[3].get_text(strip=True) if len(cols) > 3 else ""
+        change = cols[4].get_text(strip=True) if len(cols) > 4 else ""
+        volume = cols[8].get_text(strip=True) if len(cols) > 8 else ""
         results.append({
             "ticker": ticker, "name": name,
             "price": price, "change": change, "volume": volume,
