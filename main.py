@@ -69,7 +69,7 @@ async def get_next():
     d = next_bizday()
     date_str = d.strftime("%Y-%m-%d")
     url = f"https://irbank.net/market/kessan?y={date_str}"
-    async with httpx.AsyncClient(headers=HEADERS, timeout=15) as client:
+    async with httpx.AsyncClient(headers=HEADERS, timeout=60) as client:
         r = await client.get(url)
         r.raise_for_status()
     return {"date": date_str, "companies": parse_irbank(r.text, date_str)}
@@ -97,7 +97,7 @@ async def get_month(year: int, month: int):
 @app.get("/api/day")
 async def get_day(date_str: str):
     url = f"https://irbank.net/market/kessan?y={date_str}"
-    async with httpx.AsyncClient(headers=HEADERS, timeout=15) as client:
+    async with httpx.AsyncClient(headers=HEADERS, timeout=60) as client:
         r = await client.get(url)
         r.raise_for_status()
     return {"date": date_str, "companies": parse_irbank(r.text, date_str)}
@@ -108,7 +108,7 @@ async def get_day(date_str: str):
 async def get_stophigh_today():
     """株探から本日のストップ高銘柄を取得"""
     url = "https://kabutan.jp/warning/?mode=3_1"
-    async with httpx.AsyncClient(headers=HEADERS, timeout=15) as client:
+    async with httpx.AsyncClient(headers=HEADERS, timeout=60) as client:
         r = await client.get(url)
         r.raise_for_status()
 
