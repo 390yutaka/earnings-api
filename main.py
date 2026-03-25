@@ -127,11 +127,11 @@ async def get_stophigh_today():
         if not re.match(r"^\d{4}$", ticker):
             continue
         # 企業名は2番目のaタグから取得
-        links = cols[0].find_all("a")
-        name = links[1].get_text(strip=True) if len(links) > 1 else cols[1].get_text(strip=True)
-        price  = cols[3].get_text(strip=True) if len(cols) > 3 else ""
-        change = cols[4].get_text(strip=True) if len(cols) > 4 else ""
-        volume = cols[8].get_text(strip=True) if len(cols) > 8 else ""
+        name_el = cols[1].find("a") if len(cols) > 1 else None
+        name = name_el.get_text(strip=True) if name_el else cols[1].get_text(strip=True) if len(cols) > 1 else ""
+        price  = cols[2].get_text(strip=True) if len(cols) > 2 else ""
+        change = cols[3].get_text(strip=True) if len(cols) > 3 else ""
+        volume = cols[5].get_text(strip=True) if len(cols) > 5 else ""
         results.append({
             "ticker": ticker, "name": name,
             "price": price, "change": change, "volume": volume,
