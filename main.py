@@ -334,3 +334,97 @@ async def list_predictions():
     """保存済み予測の一覧"""
     predictions = load_predictions()
     return {"dates": list(predictions.keys()), "total_days": len(predictions)}
+
+# ── 追加データ取得エンドポイント ────────────────────────
+
+@app.get("/api/enrich/{ticker}")
+async def enrich_ticker(ticker: str):
+    """銘柄の追加データ（信用倍率・出来高・株探ニュース）を取得"""
+    result = {"ticker": ticker}
+
+    async with httpx.AsyncClient(headers=HEADERS, timeout=15, follow_redirects=True) as client:
+
+        # 1. 信用倍率（株探）
+        try:
+            url = f"https://kabutan.jp/stock/kabuka?code={ticker}"
+            r = await client.get(url)
+            soup = BeautifulSoup(r.text, "html.parser")
+            # 信用倍率を探す
+            for row in soup.select("table tr"):
+                if "信用倍率" in row.get_text():
+                    cols = row.find_all("td")
+                    if cols:
+                        val = cols[-1].get_text(strip=True).replace(",","")
+                        try:
+                            result["margin_ratio"] = float(val)
+                        except:
+                            pass
+                    break
+        except Exception:
+            pass
+
+        # 2. 出来高変化率（Yahoo Finance）
+        try:
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}.T?interval=1d&range=10d"
+            r = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
+            data = r.json()
+            volumes = data["chart"]["result"][0]["indicators"]["quote"][0]["volume"]
+            volumes = [v for v in volumes if v]
+            if len(volumes) >= 6:
+                avg5 = sum(volumes[-6:-1]) / 5
+                today_vol = volumes[-1]
+                if avg5 > 0:
+                    result["volume_ratio"] = round(today_vol / avg5, 2)
+        except Exception:
+            pass
+
+        # 3. 株探ニュース（直近3件のヘッドライン）
+        try:
+            url = f"https://kabutan.jp/stock/news?code={ticker}"
+            r = await client.get(url)
+            soup = BeautifulSoup(r.text, "html.parser")
+            news = []
+            for item in soup.select("div.news_headline, .news_list li, table.news_table tr")[:5]:
+                text = item.get_text(strip=True)
+                if text and len(text) > 10:
+                    news.append(text[:100])
+            result["news"] = news[:3]
+        except Exception:
+            pass
+
+        # 4. ニューススコア（キーワード分析）
+        news_score = 0
+        for n in result.get("news", []):
+            # ポジティブキーワード
+            for kw in ["上方修正","増益","最高益","大幅増","サプライズ","好決算","増配","自社株買"]:
+                if kw in n: news_score += 15
+            # ネガティブキーワード
+            for kw in ["下方修正","減益","赤字","損失","悪化","減配","希薄化"]:
+                if kw in n: news_score -= 15
+        result["news_score"] = news_score
+
+        # 5. 信用倍率スコア
+        margin_score = 0
+        mr = result.get("margin_ratio")
+        if mr is not None:
+            if mr < 1:    margin_score = 20   # 売り多い→需給良好
+            elif mr < 2:  margin_score = 10
+            elif mr < 5:  margin_score = 0
+            elif mr < 10: margin_score = -10
+            else:         margin_score = -20  # 買い多い→需給悪化
+        result["margin_score"] = margin_score
+
+        # 6. 出来高スコア
+        vol_score = 0
+        vr = result.get("volume_ratio")
+        if vr is not None:
+            if vr >= 3:   vol_score = 20
+            elif vr >= 2: vol_score = 12
+            elif vr >= 1.5: vol_score = 6
+            elif vr < 0.5: vol_score = -5
+        result["volume_score"] = vol_score
+
+        # 7. 総合追加スコア
+        result["extra_score"] = news_score + margin_score + vol_score
+
+    return result
