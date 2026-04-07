@@ -4,6 +4,8 @@ import httpx
 from bs4 import BeautifulSoup
 from datetime import date, timedelta
 import re
+import json
+import os
 
 app = FastAPI()
 
@@ -19,16 +21,23 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 }
 
+# 予測記録ファイル（Renderの一時ストレージ）
+PREDICTIONS_FILE = "/tmp/predictions.json"
+
+def load_predictions():
+    if os.path.exists(PREDICTIONS_FILE):
+        with open(PREDICTIONS_FILE, "r") as f:
+            return json.load(f)
+    return {}
+
+def save_predictions(data):
+    with open(PREDICTIONS_FILE, "w") as f:
+        json.dump(data, f, ensure_ascii=False)
+
 def next_bizday():
     d = date.today() + timedelta(days=1)
     while d.weekday() >= 5:
         d += timedelta(days=1)
-    return d
-
-def prev_bizday(d: date):
-    d = d - timedelta(days=1)
-    while d.weekday() >= 5:
-        d -= timedelta(days=1)
     return d
 
 def parse_irbank(html: str, date_str: str) -> list:
@@ -58,7 +67,38 @@ def parse_irbank(html: str, date_str: str) -> list:
         })
     return results
 
-# ── 既存エンドポイント ────────────────────────────
+# ── 株価取得（Yahoo Finance Japan）──────────────────
+async def get_stock_change(ticker: str, target_date: str) -> dict:
+    """指定日の株価変動率を取得"""
+    symbol = f"{ticker}.T"
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=5d"
+    try:
+        async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+            r = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
+            data = r.json()
+        timestamps = data["chart"]["result"][0]["timestamp"]
+        closes = data["chart"]["result"][0]["indicators"]["quote"][0]["close"]
+        opens = data["chart"]["result"][0]["indicators"]["quote"][0]["open"]
+
+        import datetime
+        target_dt = datetime.datetime.strptime(target_date, "%Y-%m-%d").date()
+
+        for i, ts in enumerate(timestamps):
+            d = datetime.datetime.fromtimestamp(ts).date()
+            if d == target_dt and closes[i] and opens[i]:
+                change_pct = round((closes[i] - opens[i]) / opens[i] * 100, 2)
+                return {
+                    "ticker": ticker,
+                    "date": target_date,
+                    "open": round(opens[i], 1),
+                    "close": round(closes[i], 1),
+                    "change_pct": change_pct
+                }
+    except Exception:
+        pass
+    return {"ticker": ticker, "date": target_date, "change_pct": None}
+
+# ── 既存エンドポイント ────────────────────────────────
 
 @app.get("/")
 def root():
@@ -69,7 +109,7 @@ async def get_next():
     d = next_bizday()
     date_str = d.strftime("%Y-%m-%d")
     url = f"https://irbank.net/market/kessan?y={date_str}"
-    async with httpx.AsyncClient(headers=HEADERS, timeout=60) as client:
+    async with httpx.AsyncClient(headers=HEADERS, timeout=15, follow_redirects=True) as client:
         r = await client.get(url)
         r.raise_for_status()
     return {"date": date_str, "companies": parse_irbank(r.text, date_str)}
@@ -79,7 +119,7 @@ async def get_month(year: int, month: int):
     from calendar import monthrange
     _, days = monthrange(year, month)
     results = []
-    async with httpx.AsyncClient(headers=HEADERS, timeout=60) as client:
+    async with httpx.AsyncClient(headers=HEADERS, timeout=60, follow_redirects=True) as client:
         for day in range(1, days + 1):
             d = date(year, month, day)
             if d.weekday() >= 5:
@@ -97,36 +137,29 @@ async def get_month(year: int, month: int):
 @app.get("/api/day")
 async def get_day(date_str: str):
     url = f"https://irbank.net/market/kessan?y={date_str}"
-    async with httpx.AsyncClient(headers=HEADERS, timeout=60) as client:
+    async with httpx.AsyncClient(headers=HEADERS, timeout=15, follow_redirects=True) as client:
         r = await client.get(url)
         r.raise_for_status()
     return {"date": date_str, "companies": parse_irbank(r.text, date_str)}
 
-# ── 新エンドポイント①: 今日のストップ高銘柄 ──────────
-
 @app.get("/api/stophigh/today")
 async def get_stophigh_today():
-    """株探から本日のストップ高銘柄を取得"""
     url = "https://kabutan.jp/warning/?mode=3_1"
-    async with httpx.AsyncClient(headers=HEADERS, timeout=60) as client:
+    async with httpx.AsyncClient(headers=HEADERS, timeout=15, follow_redirects=True) as client:
         r = await client.get(url)
         r.raise_for_status()
-
     soup = BeautifulSoup(r.text, "html.parser")
     results = []
-
     for row in soup.select("table tr"):
         cols = row.find_all("td")
         if len(cols) < 4:
             continue
-        # 銘柄コードとnameは同じセルにある
         code_el = cols[0].find("a")
         if not code_el:
             continue
         ticker = re.sub(r"\D", "", code_el.get_text())
         if not re.match(r"^\d{4}$", ticker):
             continue
-        # 企業名は2番目のaタグから取得
         name_el = cols[1].find("a") if len(cols) > 1 else None
         name = name_el.get_text(strip=True) if name_el else cols[1].get_text(strip=True) if len(cols) > 1 else ""
         price  = cols[2].get_text(strip=True) if len(cols) > 2 else ""
@@ -137,43 +170,30 @@ async def get_stophigh_today():
             "price": price, "change": change, "volume": volume,
             "date": date.today().strftime("%Y-%m-%d")
         })
-
     return {"date": date.today().strftime("%Y-%m-%d"), "stocks": results}
-
-# ── 新エンドポイント②: 決算後ストップ高照合 ────────────
 
 @app.get("/api/stophigh/after_earnings")
 async def get_stophigh_after_earnings(days: int = 30):
-    """過去N日の決算発表銘柄のうち翌日ストップ高になったものを返す"""
     today = date.today()
     results = []
-
-    async with httpx.AsyncClient(headers=HEADERS, timeout=60) as client:
+    async with httpx.AsyncClient(headers=HEADERS, timeout=60, follow_redirects=True) as client:
         for i in range(1, days + 1):
             target = today - timedelta(days=i)
             if target.weekday() >= 5:
                 continue
             date_str = target.strftime("%Y-%m-%d")
-
-            # その日の決算発表銘柄を取得
             try:
                 r = await client.get(f"https://irbank.net/market/kessan?y={date_str}")
                 companies = parse_irbank(r.text, date_str)
             except Exception:
                 continue
-
             if not companies:
                 continue
-
-            # 翌営業日を計算
             next_d = target + timedelta(days=1)
             while next_d.weekday() >= 5:
                 next_d += timedelta(days=1)
-
-            # 株探のストップ高ページから翌日のストップ高銘柄リストを取得
-            next_str = next_d.strftime("%Y%m%d")
             try:
-                sh_url = f"https://kabutan.jp/warning/?mode=3_1&date={next_str}"
+                sh_url = f"https://kabutan.jp/warning/?mode=3_1&date={next_d.strftime('%Y%m%d')}"
                 sr = await client.get(sh_url)
                 sh_soup = BeautifulSoup(sr.text, "html.parser")
                 sh_tickers = set()
@@ -189,19 +209,128 @@ async def get_stophigh_after_earnings(days: int = 30):
                         sh_tickers.add(t)
             except Exception:
                 continue
-
-            # 照合
             for c in companies:
                 if c["ticker"] in sh_tickers:
                     results.append({
-                        "ticker": c["ticker"],
-                        "name": c["name"],
+                        "ticker": c["ticker"], "name": c["name"],
                         "earnings_date": date_str,
                         "stophigh_date": next_d.strftime("%Y-%m-%d"),
                         "decision_type": c["decision_type"],
                         "market_cap": c["market_cap"],
-                        "per": c["per"],
-                        "roe": c["roe"],
+                        "per": c["per"], "roe": c["roe"],
                     })
-
     return {"period_days": days, "stocks": results}
+
+# ── 新機能: 予測保存 ──────────────────────────────────
+
+@app.post("/api/prediction/save")
+async def save_prediction(body: dict):
+    """フロントから予測データを保存"""
+    predictions = load_predictions()
+    date_str = body.get("date")
+    if not date_str:
+        return {"error": "date required"}
+    predictions[date_str] = body.get("companies", [])
+    save_predictions(predictions)
+    return {"saved": len(predictions[date_str]), "date": date_str}
+
+# ── 新機能: 的中率検証 ────────────────────────────────
+
+@app.get("/api/prediction/verify")
+async def verify_predictions(days: int = 30):
+    """保存済み予測と実際の株価を照合して的中率を返す"""
+    predictions = load_predictions()
+    if not predictions:
+        return {"results": [], "summary": {"total": 0, "hit": 0, "rate": 0}}
+
+    today = date.today()
+    results = []
+
+    for date_str, companies in predictions.items():
+        pred_date = date.fromisoformat(date_str)
+        # 翌営業日を計算
+        next_d = pred_date + timedelta(days=1)
+        while next_d.weekday() >= 5:
+            next_d += timedelta(days=1)
+
+        # 翌営業日がまだ来ていなければスキップ
+        if next_d > today:
+            continue
+
+        next_str = next_d.strftime("%Y-%m-%d")
+
+        for c in companies:
+            ticker = c.get("ticker")
+            verdict = c.get("verdict")
+            upside = c.get("upside", 0)
+            if not ticker:
+                continue
+
+            # 株価変動を取得
+            price_data = await get_stock_change(ticker, next_str)
+            change_pct = price_data.get("change_pct")
+
+            if change_pct is None:
+                continue
+
+            # 的中判定
+            # ストップ高予測 → +15%以上
+            # 上昇期待 → +3%以上
+            # 中立 → -3%〜+3%
+            # 下落懸念 → -3%以下
+            # ストップ安 → -15%以下
+            hit_thresholds = {
+                "stop-high": lambda x: x >= 15,
+                "surge":     lambda x: x >= 3,
+                "neutral":   lambda x: -3 <= x <= 3,
+                "fall":      lambda x: x <= -3,
+                "stop-low":  lambda x: x <= -15,
+            }
+            checker = hit_thresholds.get(verdict)
+            is_hit = checker(change_pct) if checker else False
+
+            results.append({
+                "ticker": ticker,
+                "name": c.get("name", ""),
+                "earnings_date": date_str,
+                "check_date": next_str,
+                "verdict": verdict,
+                "upside": upside,
+                "change_pct": change_pct,
+                "is_hit": is_hit,
+                "open": price_data.get("open"),
+                "close": price_data.get("close"),
+            })
+
+    total = len(results)
+    hit = sum(1 for r in results if r["is_hit"])
+    rate = round(hit / total * 100, 1) if total > 0 else 0
+
+    # 上昇期待度別の的中率
+    high_upside = [r for r in results if r["upside"] >= 70]
+    mid_upside  = [r for r in results if 40 <= r["upside"] < 70]
+    low_upside  = [r for r in results if r["upside"] < 40]
+
+    def calc_rate(lst):
+        if not lst: return 0
+        return round(sum(1 for r in lst if r["is_hit"]) / len(lst) * 100, 1)
+
+    return {
+        "results": sorted(results, key=lambda x: x["earnings_date"], reverse=True),
+        "summary": {
+            "total": total,
+            "hit": hit,
+            "rate": rate,
+            "by_upside": {
+                "high_70plus": {"count": len(high_upside), "rate": calc_rate(high_upside)},
+                "mid_40_70":   {"count": len(mid_upside),  "rate": calc_rate(mid_upside)},
+                "low_under40": {"count": len(low_upside),  "rate": calc_rate(low_upside)},
+            }
+        }
+    }
+
+@app.get("/api/prediction/list")
+async def list_predictions():
+    """保存済み予測の一覧"""
+    predictions = load_predictions()
+    return {"dates": list(predictions.keys()), "total_days": len(predictions)}
