@@ -160,11 +160,19 @@ async def get_stophigh_today():
         ticker = re.sub(r"\D", "", code_el.get_text())
         if not re.match(r"^\d{4}$", ticker):
             continue
-        name_el = cols[1].find("a") if len(cols) > 1 else None
-        name = name_el.get_text(strip=True) if name_el else cols[1].get_text(strip=True) if len(cols) > 1 else ""
-        price  = cols[2].get_text(strip=True) if len(cols) > 2 else ""
-        change = cols[3].get_text(strip=True) if len(cols) > 3 else ""
-        volume = cols[5].get_text(strip=True) if len(cols) > 5 else ""
+        # 企業名はコードの隣のセルから取得（株探の構造: コード | 市場 | 企業名 | ...）
+        name = ""
+        for ci in range(1, min(4, len(cols))):
+            t = cols[ci].get_text(strip=True)
+            # 市場区分でなく企業名らしいものを探す
+            if t and not re.match(r'^[東名札福][PSGMENR]', t) and len(t) > 1:
+                name = t
+                break
+        if not name and len(cols) > 1:
+            name = cols[1].get_text(strip=True)
+        price  = cols[3].get_text(strip=True) if len(cols) > 3 else ""
+        change = cols[4].get_text(strip=True) if len(cols) > 4 else ""
+        volume = cols[6].get_text(strip=True) if len(cols) > 6 else ""
         results.append({
             "ticker": ticker, "name": name,
             "price": price, "change": change, "volume": volume,
