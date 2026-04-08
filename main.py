@@ -156,6 +156,20 @@ async def get_day(date_str: str):
         r.raise_for_status()
     return {"date": date_str, "companies": parse_irbank(r.text, date_str)}
 
+
+@app.get("/api/debug/stophigh")
+async def debug_stophigh():
+    """株探のストップ高HTMLをデバッグ"""
+    url = "https://kabutan.jp/warning/?mode=3_1"
+    async with httpx.AsyncClient(headers=HEADERS, timeout=15, follow_redirects=True) as client:
+        r = await client.get(url)
+    soup = BeautifulSoup(r.text, "html.parser")
+    rows = soup.select("table tr")
+    result = []
+    for row in rows[1:5]:  # 最初の4行だけ
+        cols = row.find_all("td")
+        result.append([c.get_text(strip=True) for c in cols[:8]])
+    return {"rows": result}
 @app.get("/api/stophigh/today")
 async def get_stophigh_today():
     url = "https://kabutan.jp/warning/?mode=3_1"
@@ -174,13 +188,8 @@ async def get_stophigh_today():
         ticker = re.sub(r"\D", "", code_el.get_text())
         if not re.match(r"^\d{4}$", ticker):
             continue
-        # 企業名取得（市場区分をスキップ）
-        name = ""
-        for ci in range(1, min(6, len(cols))):
-            t = cols[ci].get_text(strip=True)
-            if t and not re.match(r'^[東名札福][PSGMENRｐｓｇ]', t) and not re.match(r'^\d', t) and len(t) > 1:
-                name = t
-                break
+        # 企業名は2列目（cols[1]）に固定
+        name = cols[1].get_text(strip=True) if len(cols) > 1 else ""
         if not name and len(cols) > 1:
             name = cols[1].get_text(strip=True)
         price  = cols[3].get_text(strip=True) if len(cols) > 3 else ""
