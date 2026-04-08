@@ -54,7 +54,7 @@ tr{animation:fadeIn .3s ease both;}
       <div id="today-date" style="font-size:12px;color:#4a6070;"></div>
       <button id="today-reload" onclick="loadToday()" style="display:none;background:rgba(0,229,255,0.07);border:1px solid #00e5ff;color:#00e5ff;padding:5px 14px;border-radius:4px;font-size:11px;">🔄 再取得</button>
     </div>
-    <div id="tomorrow-content"><div class="status-box"><div class="spin"></div><div style="font-size:12px;color:#4a6070;margin-top:12px;">取得中...</div></div></div>
+    <div id="today-content"><div class="status-box"><div class="spin"></div><div style="font-size:12px;color:#4a6070;margin-top:12px;">取得中...</div></div></div>
   </div>
 
   <!-- ② 翌営業日 -->
@@ -64,7 +64,7 @@ tr{animation:fadeIn .3s ease both;}
       <div id="next-date" style="font-size:12px;color:#4a6070;"></div>
       <button id="today-reload" onclick="loadToday()" style="display:none;background:rgba(0,229,255,0.07);border:1px solid #00e5ff;color:#00e5ff;padding:5px 14px;border-radius:4px;font-size:11px;">🔄 再取得</button>
     </div>
-    <div id="today-content"><div class="status-box"><div class="spin"></div><div style="font-size:12px;color:#4a6070;margin-top:12px;">取得中...</div></div></div>
+    <div id="tomorrow-content"><div class="status-box"><div class="spin"></div><div style="font-size:12px;color:#4a6070;margin-top:12px;">取得中...</div></div></div>
   </div>
 
   <!-- ② 先5営業日 -->
@@ -116,6 +116,20 @@ tr{animation:fadeIn .3s ease both;}
   </div>
 
 
+  <!-- 的中率タブ -->
+  <div id="tab-accuracy" class="tab-panel">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+      <div style="font-size:17px;font-weight:900;letter-spacing:2px;color:#00e5ff;">📊 予測的中率レポート</div>
+      <button onclick="loadAccuracy()" style="background:rgba(0,229,255,0.07);border:1px solid #00e5ff;color:#00e5ff;padding:5px 14px;border-radius:4px;font-size:11px;">🔄 更新</button>
+    </div>
+    <div id="accuracy-content">
+      <div class="status-box">
+        <div style="font-size:28px;margin-bottom:10px;">📊</div>
+        <div style="font-size:13px;color:#c8d8e8;margin-bottom:8px;">予測データがまだありません</div>
+        <div style="font-size:11px;color:#4a6070;">各タブで銘柄を閲覧すると自動的に予測が保存されます。<br>翌営業日以降に的中率を確認できます。</div>
+      </div>
+    </div>
+  </div>
 
 </div>
 
@@ -1017,20 +1031,7 @@ loaded['today']=true;
 loadToday();
 </script>
 </body>
+
+
+
 </html>
-  <!-- 的中率タブ -->
-  <div id="tab-accuracy" class="tab-panel">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
-      <div style="font-size:17px;font-weight:900;letter-spacing:2px;color:#00e5ff;">📊 予測的中率レポート</div>
-      <button onclick="loadAccuracy()" style="background:rgba(0,229,255,0.07);border:1px solid #00e5ff;color:#00e5ff;padding:5px 14px;border-radius:4px;font-size:11px;">🔄 更新</button>
-    </div>
-    <div id="accuracy-content">
-      <div class="status-box">
-        <div style="font-size:28px;margin-bottom:10px;">📊</div>
-        <div style="font-size:13px;color:#c8d8e8;margin-bottom:8px;">予測データがまだありません</div>
-        <div style="font-size:11px;color:#4a6070;">各タブで銘柄を閲覧すると自動的に予測が保存されます。<br>翌営業日以降に的中率を確認できます。</div>
-      </div>
-    </div>
-  </div>
-
-
