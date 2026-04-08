@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
-from pathlib import Pathfrom fastapi.middleware.cors import CORSMiddleware
+from pathlib import Path
+from fastapi.middleware.cors import CORSMiddleware
 import httpx
 from bs4 import BeautifulSoup
 from datetime import date, timedelta
@@ -104,6 +105,14 @@ async def get_stock_change(ticker: str, target_date: str) -> dict:
 @app.get("/")
 def root():
     return {"status": "ok", "message": "Earnings API is running"}
+
+@app.get("/app", response_class=HTMLResponse)
+async def serve_app():
+    """HTMLアプリを配信"""
+    html_path = Path(__file__).parent / "earnings_radar.html"
+    if html_path.exists():
+        return html_path.read_text(encoding="utf-8")
+    return HTMLResponse("<h1>earnings_radar.html が見つかりません</h1>", status_code=404)
 
 @app.get("/api/next")
 async def get_next():
