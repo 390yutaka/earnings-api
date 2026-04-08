@@ -174,12 +174,11 @@ async def get_stophigh_today():
         ticker = re.sub(r"\D", "", code_el.get_text())
         if not re.match(r"^\d{4}$", ticker):
             continue
-        # 企業名はコードの隣のセルから取得（株探の構造: コード | 市場 | 企業名 | ...）
+        # 企業名取得（市場区分をスキップ）
         name = ""
-        for ci in range(1, min(4, len(cols))):
+        for ci in range(1, min(6, len(cols))):
             t = cols[ci].get_text(strip=True)
-            # 市場区分でなく企業名らしいものを探す
-            if t and not re.match(r'^[東名札福][PSGMENR]', t) and len(t) > 1:
+            if t and not re.match(r'^[東名札福][PSGMENRｐｓｇ]', t) and not re.match(r'^\d', t) and len(t) > 1:
                 name = t
                 break
         if not name and len(cols) > 1:
