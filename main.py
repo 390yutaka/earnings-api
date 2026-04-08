@@ -164,12 +164,14 @@ async def debug_stophigh():
     async with httpx.AsyncClient(headers=HEADERS, timeout=15, follow_redirects=True) as client:
         r = await client.get(url)
     soup = BeautifulSoup(r.text, "html.parser")
-    rows = soup.select("table tr")
     result = []
-    for row in rows[1:5]:  # 最初の4行だけ
-        cols = row.find_all("td")
-        result.append([c.get_text(strip=True) for c in cols[:8]])
-    return {"rows": result}
+    for i, table in enumerate(soup.find_all("table")):
+        rows = table.find_all("tr")
+        for j, row in enumerate(rows[:3]):
+            cols = row.find_all(["td","th"])
+            if cols:
+                result.append({"table": i, "row": j, "cols": [c.get_text(strip=True)[:20] for c in cols[:8]]})
+    return {"rows": result[:20]}
 @app.get("/api/stophigh/today")
 async def get_stophigh_today():
     url = "https://kabutan.jp/warning/?mode=3_1"
