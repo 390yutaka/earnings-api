@@ -1,5 +1,6 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from pathlib import Pathfrom fastapi.middleware.cors import CORSMiddleware
 import httpx
 from bs4 import BeautifulSoup
 from datetime import date, timedelta
