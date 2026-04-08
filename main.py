@@ -37,7 +37,11 @@ def save_predictions(data):
         json.dump(data, f, ensure_ascii=False)
 
 def next_bizday():
-    d = date.today() + timedelta(days=1)
+    # 日本時間で今日の日付を取得
+    import datetime as dt
+    jst_now = dt.datetime.utcnow() + dt.timedelta(hours=9)
+    today = jst_now.date()
+    d = today + timedelta(days=1)
     while d.weekday() >= 5:
         d += timedelta(days=1)
     return d
