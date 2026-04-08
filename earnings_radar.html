@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EARNINGS RADAR</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;700;900&family=Share+Tech+Mono&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#080c10;--surface:#0d1318;--surface2:#111820;--border:#1e2d3d;--accent:#00e5ff;--green:#00ff88;--red:#ff3355;--yellow:#ffd700;--text:#c8d8e8;--text-dim:#4a6070;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Noto Sans JP',sans-serif;min-height:100vh;}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+button{cursor:pointer;font-family:inherit;}
+.spin{display:inline-block;width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
+.status-box{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:40px;text-align:center;}
+table{width:100%;border-collapse:collapse;}
+tr{animation:fadeIn .3s ease both;}
+
+/* タブ */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:24px;overflow-x:auto;}
+.tab-btn{background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text-dim);padding:12px 20px;font-size:13px;font-weight:700;letter-spacing:1px;white-space:nowrap;transition:all .2s;margin-bottom:-1px;}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+</style>
+</head>
+<body>
+<div style="background:rgba(8,12,16,0.97);border-bottom:1px solid #1e2d3d;padding:14px 28px;position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:14px;">
+  <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:4px;color:#00e5ff;text-shadow:0 0 16px rgba(0,229,255,0.3);">EARNINGS RADAR</div>
+  <div style="font-size:10px;color:#4a6070;letter-spacing:2px;">IRBANK × AI分析</div>
+  <div style="margin-left:auto;font-size:9px;color:#00ff88;padding:2px 8px;border:1px solid #00ff8844;border-radius:3px;">● LIVE</div>
+</div>
+
+<div style="max-width:1300px;margin:0 auto;padding:20px 24px;">
+
+  <!-- タブナビゲーション -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('today',this)">📋 当日</button>
+    <button class="tab-btn" onclick="switchTab('tomorrow',this)">📋 翌営業日</button>
+    <button class="tab-btn" onclick="switchTab('w5',this)">📅 先5営業日</button>
+    <button class="tab-btn" onclick="switchTab('w10',this)">📅 先10営業日</button>
+    <button class="tab-btn" onclick="switchTab('spotlight',this)">🔥 注目株</button>
+    <button class="tab-btn" onclick="switchTab('stophigh',this)">🚀 ストップ高</button>
+    <button class="tab-btn" onclick="switchTab('accuracy',this)">📊 的中率</button>
+    
+  </div>
+
+  <!-- ① 当日 -->
+  <div id="tab-today" class="tab-panel active">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+      <div style="font-size:17px;font-weight:900;letter-spacing:2px;color:#00e5ff;">📋 本日の決算発表</div>
+      <div id="today-date" style="font-size:12px;color:#4a6070;"></div>
+      <button id="today-reload" onclick="loadToday()" style="display:none;background:rgba(0,229,255,0.07);border:1px solid #00e5ff;color:#00e5ff;padding:5px 14px;border-radius:4px;font-size:11px;">🔄 再取得</button>
+    </div>
+    <div id="tomorrow-content"><div class="status-box"><div class="spin"></div><div style="font-size:12px;color:#4a6070;margin-top:12px;">取得中...</div></div></div>
+  </div>
+
+  <!-- ② 翌営業日 -->
+  <div id="tab-tomorrow" class="tab-panel active">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+      <div style="font-size:17px;font-weight:900;letter-spacing:2px;color:#00e5ff;">📋 翌営業日の決算発表</div>
+      <div id="next-date" style="font-size:12px;color:#4a6070;"></div>
+      <button id="today-reload" onclick="loadToday()" style="display:none;background:rgba(0,229,255,0.07);border:1px solid #00e5ff;color:#00e5ff;padding:5px 14px;border-radius:4px;font-size:11px;">🔄 再取得</button>
+    </div>
+    <div id="today-content"><div class="status-box"><div class="spin"></div><div style="font-size:12px;color:#4a6070;margin-top:12px;">取得中...</div></div></div>
+  </div>
+
+  <!-- ② 先5営業日 -->
+  <div id="tab-w5" class="tab-panel">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+      <div style="font-size:17px;font-weight:900;letter-spacing:2px;color:#00e5ff;">📅 先5営業日の決算一覧</div>
+      <div id="w5-dates" style="font-size:11px;color:#4a6070;"></div>
+    </div>
+    <div id="w5-content"><div class="status-box"><div class="spin"></div><div style="font-size:12px;color:#4a6070;margin-top:12px;">取得中...</div></div></div>
+  </div>
+
+  <!-- ③ 先10営業日 -->
+  <div id="tab-w10" class="tab-panel">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+      <div style="font-size:17px;font-weight:900;letter-spacing:2px;color:#00e5ff;">📅 先10営業日の決算一覧</div>
+      <div id="w10-dates" style="font-size:11px;color:#4a6070;"></div>
+    </div>
+    <div id="w10-content"><div class="status-box"><div class="spin"></div><div style="font-size:12px;color:#4a6070;margin-top:12px;">取得中...</div></div></div>
+  </div>
+
+  <!-- ④ 注目株 -->
+  <div id="tab-spotlight" class="tab-panel">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+      <div style="font-size:17px;font-weight:900;letter-spacing:2px;color:#00e5ff;">🔥 当月・翌月のストップ高注目株</div>
+      <div style="font-size:10px;color:#4a6070;">確信度75%以上の銘柄を抽出</div>
+    </div>
+    <div id="spotlight-content"><div class="status-box"><div class="spin"></div><div style="font-size:12px;color:#4a6070;margin-top:12px;">注目株を抽出中...</div></div></div>
+  </div>
+
+  <!-- ⑤ ストップ高 -->
+  <div id="tab-stophigh" class="tab-panel">
+    <!-- 本日のストップ高 -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+      <div style="font-size:17px;font-weight:900;letter-spacing:2px;color:#00e5ff;">🚀 本日のストップ高銘柄</div>
+      <div style="font-size:10px;color:#4a6070;">株探データ</div>
+      <button onclick="loadStopHighToday()" style="background:rgba(0,229,255,0.07);border:1px solid #00e5ff;color:#00e5ff;padding:5px 14px;border-radius:4px;font-size:11px;">🔄 更新</button>
+    </div>
+    <div id="sh-today-content" style="margin-bottom:32px;"><div class="status-box"><div class="spin"></div><div style="font-size:12px;color:#4a6070;margin-top:12px;">取得中...</div></div></div>
+
+    <div style="border-top:1px solid var(--border);margin-bottom:24px;"></div>
+
+    <!-- 決算後ストップ高 -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+      <div style="font-size:17px;font-weight:900;letter-spacing:2px;color:#00e5ff;">📈 決算発表後にストップ高になった銘柄</div>
+      <div style="font-size:10px;color:#4a6070;">過去30日間</div>
+      <button onclick="loadStopHighAfter()" style="background:rgba(0,229,255,0.07);border:1px solid #00e5ff;color:#00e5ff;padding:5px 14px;border-radius:4px;font-size:11px;">🔄 更新</button>
+    </div>
+    <div id="sh-after-content"><div class="status-box"><div class="spin"></div><div style="font-size:12px;color:#4a6070;margin-top:12px;">照合中...</div></div></div>
+  </div>
+
+
+
+</div>
+
+<script>
+const BACKEND = "https://earnings-api-y92s.onrender.com";
+const VL = {"stop-high":"ストップ高","surge":"上昇期待","neutral":"中　立","fall":"下落懸念","stop-low":"ストップ安"};
+const VC = {"stop-high":"#00ff88","surge":"#88ffcc","neutral":"#ffd700","fall":"#ff9966","stop-low":"#ff3355"};
+const VDESC = {"stop-high":"翌日の値幅上限まで上昇する可能性","surge":"好決算で大幅高が期待される","neutral":"方向感なし・様子見","fall":"悪材料で売られやすい","stop-low":"翌日の値幅下限まで下落する可能性"};
+
+let calYear, calMonth, dayCounts=[], selectedDay=null;
+const now = new Date();
+calYear=now.getFullYear(); calMonth=now.getMonth()+1;
+
+// タブ切り替え
+const loaded = {};
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+  // 遅延ロード
+  if(!loaded[name]){
+    loaded[name]=true;
+    if(name==='tomorrow') loadTomorrow();
+    if(name==='w5') loadWeek(5,'w5-content','w5-dates');
+    if(name==='w10') loadWeek(10,'w10-content','w10-dates');
+    if(name==='spotlight') loadSpotlight();
+    if(name==='stophigh'){loadStopHighToday();loadStopHighAfter();}
+    if(name==='accuracy') loadAccuracy();
+    if(name==='calendar') loadCalendar(calYear,calMonth);
+  }
+}
+
+
+// 日本時間で今日の日付を取得
+function getTodayJST(){
+  const now = new Date();
+  const jst = new Date(now.getTime() + 9*60*60*1000);
+  return jst.toISOString().slice(0,10);
+}
+
+function pad2(n){return String(n).padStart(2,"0");}
+function getDays(y,m){return new Date(y,m,0).getDate();}
+function getFirstDow(y,m){return new Date(y,m-1,1).getDay();}
+function fmtJP(ds){const d=new Date(ds+"T00:00:00");return`${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${'日月火水木金土'[d.getDay()]}）`;}
+function fmtShort(ds){const d=new Date(ds+"T00:00:00");return`${d.getMonth()+1}/${d.getDate()}（${'日月火水木金土'[d.getDay()]}）`;}
+
+function getBizDays(from,count){
+  const days=[];let d=new Date(from);d.setDate(d.getDate()+1);
+  while(days.length<count){if(d.getDay()!==0&&d.getDay()!==6)days.push(new Date(d));d.setDate(d.getDate()+1);}
+  return days;
+}
+
+function computeScore(c){
+  const per = c.per ? parseFloat(c.per) : null;
+  const roe = c.roe ? parseFloat(c.roe) : null;
+  const gd = {"大幅上方修正":40,"上方修正":25,"据え置き":0,"下方修正":-30,"未発表":0};
+  let score = gd[c.guidance] || 0;
+
+  if(per !== null && per > 0){
+    if(per < 10)       score += 40;
+    else if(per < 15)  score += 25;
+    else if(per < 25)  score += 5;
+    else if(per < 40)  score -= 5;
+    else               score -= 25;
+  }
+
+  if(roe !== null){
+    if(roe >= 20)      score += 30;
+    else if(roe >= 15) score += 20;
+    else if(roe >= 10) score += 10;
+    else if(roe >= 5)  score += 0;
+    else if(roe >= 1)  score -= 10;
+    else               score -= 30;
+  }
+
+  let capBonus = 0;
+  if(c.market_cap){
+    const capNum = parseInt(c.market_cap.replace(/[^0-9]/g,""));
+    if(!c.market_cap.includes("兆")){
+      if(capNum < 50) capBonus = 20;
+      else if(capNum < 100) capBonus = 10;
+      else if(capNum < 300) capBonus = 5;
+    }
+    score += capBonus;
+  }
+
+  if(c.decision_type && c.decision_type.includes("本決算")) score += 10;
+
+  let v, conf;
+  if(score >= 60)       { v="stop-high"; conf=Math.min(92, 70+score*0.3); }
+  else if(score >= 30)  { v="surge";     conf=Math.min(85, 60+score*0.4); }
+  else if(score >= -15) { v="neutral";   conf=Math.min(70, 50+Math.abs(score)*0.3); }
+  else if(score >= -45) { v="fall";      conf=Math.min(85, 55+Math.abs(score)*0.4); }
+  else                  { v="stop-low";  conf=Math.min(90, 60+Math.abs(score)*0.3); }
+
+  // 上昇期待度（0〜100）確信度とは別に「実際に上がりそうか」
+  let upside = 0;
+  if(per !== null && per > 0){
+    if(per < 10) upside += 30;
+    else if(per < 15) upside += 22;
+    else if(per < 20) upside += 12;
+    else if(per < 30) upside += 5;
+  }
+  if(roe !== null && roe > 0){
+    if(roe >= 25) upside += 25;
+    else if(roe >= 20) upside += 20;
+    else if(roe >= 15) upside += 14;
+    else if(roe >= 10) upside += 8;
+    else if(roe >= 5)  upside += 3;
+  }
+  upside += Math.min(20, capBonus * 1.5);
+  const gdUp = {"大幅上方修正":20,"上方修正":14,"据え置き":5,"下方修正":0,"未発表":5};
+  upside += gdUp[c.guidance] || 5;
+  if(c.decision_type && c.decision_type.includes("本決算")) upside += 5;
+  upside = Math.min(100, Math.max(0, Math.round(upside)));
+
+  // 上昇期待度の根拠
+  const upsideBreakdown = [];
+  if(per !== null && per > 0){
+    if(per < 10) upsideBreakdown.push({label:"PER割安", point:30, color:"#00ff88"});
+    else if(per < 15) upsideBreakdown.push({label:"PER割安", point:22, color:"#00ff88"});
+    else if(per < 20) upsideBreakdown.push({label:"PER適正", point:12, color:"#88ffcc"});
+    else if(per < 30) upsideBreakdown.push({label:"PERやや高", point:5, color:"#ffd700"});
+    else upsideBreakdown.push({label:"PER割高", point:0, color:"#ff9966"});
+  }
+  if(roe !== null && roe > 0){
+    if(roe >= 25) upsideBreakdown.push({label:"ROE超高収益", point:25, color:"#00ff88"});
+    else if(roe >= 20) upsideBreakdown.push({label:"ROE高収益", point:20, color:"#00ff88"});
+    else if(roe >= 15) upsideBreakdown.push({label:"ROE良好", point:14, color:"#88ffcc"});
+    else if(roe >= 10) upsideBreakdown.push({label:"ROE普通", point:8, color:"#ffd700"});
+    else if(roe >= 5) upsideBreakdown.push({label:"ROE低め", point:3, color:"#ff9966"});
+    else upsideBreakdown.push({label:"ROE低い", point:0, color:"#ff3355"});
+  }
+  if(capBonus > 0){
+    upsideBreakdown.push({label:"小型株ボーナス", point:Math.min(20,capBonus*1.5), color:"#88ffcc"});
+  }
+  const gdUpLabel = {"大幅上方修正":"ガイダンス大幅上方","上方修正":"ガイダンス上方","据え置き":"ガイダンス据置","下方修正":"ガイダンス下方","未発表":"ガイダンス未発表"};
+  const gdUpPt = {"大幅上方修正":20,"上方修正":14,"据え置き":5,"下方修正":0,"未発表":5};
+  if(c.guidance && gdUpLabel[c.guidance]){
+    upsideBreakdown.push({label:gdUpLabel[c.guidance], point:gdUpPt[c.guidance]||0, color:c.guidance==="下方修正"?"#ff3355":c.guidance==="上方修正"||c.guidance==="大幅上方修正"?"#00ff88":"#ffd700"});
+  }
+  if(c.decision_type && c.decision_type.includes("本決算")){
+    upsideBreakdown.push({label:"本決算ボーナス", point:5, color:"#88ffcc"});
+  }
+
+  return{verdict:v, confidence:Math.round(conf), upside, upsideBreakdown};
+}
+
+function buildReason(c,v){
+  const p=[];
+  p.push(`${c.decision_type||"決算"}を${c.announcement_time||"本日"}に発表予定`);
+  if(c.market_cap)p.push(`時価総額${c.market_cap}`);
+  if(c.per&&parseFloat(c.per)>0){
+    const per=parseFloat(c.per);
+    if(per<15)p.push(`PER${c.per}倍と割安水準`);
+    else if(per>40)p.push(`PER${c.per}倍と高バリュエーション`);
+    else p.push(`PER${c.per}倍`);
+  }
+  if(c.roe&&parseFloat(c.roe)>15)p.push(`ROE${c.roe}%と高収益体質`);
+  const end={"stop-high":"材料が揃えばストップ高も視野に入る。","surge":"好決算なら翌営業日の大幅高が期待される。","neutral":"方向感は決算内容次第で中立的な展開を予想。","fall":"期待値が低く悪材料には素直に反応しやすい。","stop-low":"業績悪化が続けばストップ安も警戒が必要。"};
+  return p.join("、")+"。"+(end[v]||"");
+}
+
+function perBadge(per){
+  if(!per||parseFloat(per)<=0)return`<span style="color:#4a6070;">PER ─</span>`;
+  const p=parseFloat(per);
+  let color,icon;
+  if(p<15){color="#00ff88";icon="↓割安";}
+  else if(p<25){color="#88ffcc";icon="適正";}
+  else if(p<40){color="#ffd700";icon="やや高";}
+  else{color="#ff9966";icon="↑割高";}
+  return`<span style="color:${color};font-weight:700;" title="PER: 低いほど割安">PER ${per} <span style="font-size:9px;padding:1px 4px;background:${color}22;border-radius:3px;">${icon}</span></span>`;
+}
+
+function roeBadge(roe){
+  if(!roe||parseFloat(roe)<=0)return`<span style="color:#4a6070;">ROE ─</span>`;
+  const r=parseFloat(roe);
+  let color,icon;
+  if(r>=20){color="#00ff88";icon="◎高収益";}
+  else if(r>=10){color="#88ffcc";icon="○良好";}
+  else if(r>=5){color="#ffd700";icon="△普通";}
+  else{color="#ff9966";icon="▽低め";}
+  return`<span style="color:${color};font-weight:700;" title="ROE: 高いほど効率よく稼ぐ">ROE ${roe}% <span style="font-size:9px;padding:1px 4px;background:${color}22;border-radius:3px;">${icon}</span></span>`;
+}
+
+function legendBar(){
+  let h=`<div style="background:#0d1318;border:1px solid #1e2d3d;border-radius:8px;padding:10px 16px;margin-bottom:12px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><span style="font-size:10px;color:#4a6070;margin-right:4px;">AI判定：</span>`;
+  for(const v of["stop-high","surge","neutral","fall","stop-low"]){
+    h+=`<span title="${VDESC[v]}" style="display:inline-flex;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:1px;border:1px solid ${VC[v]}44;background:${VC[v]}11;color:${VC[v]};cursor:default;">${VL[v]}</span>`;
+  }
+  h+=`<span style="font-size:9px;color:#2a4050;margin-left:4px;">カーソルを乗せると説明表示</span></div>`;
+  return h;
+}
+
+async function apiGet(path){
+  const res=await fetch(BACKEND+path);
+  if(!res.ok)throw new Error(`サーバーエラー ${res.status}`);
+  return res.json();
+}
+
+
+// ── キャッシュ ──
+const dayCache = {};
+
+// ── 右カレンダー生成 ──
+function buildSideCalendar(containerId, selectedDate){
+  const now = new Date();
+  let cy = now.getFullYear(), cm = now.getMonth()+1;
+  // 選択中の日付があればその月を表示
+  if(selectedDate){ const sd=new Date(selectedDate+"T00:00:00"); cy=sd.getFullYear(); cm=sd.getMonth()+1; }
+
+  const calId = "sidecal-"+containerId;
+  const el = document.getElementById(calId);
+  if(!el) return;
+
+  const days=getDays(cy,cm), firstDow=getFirstDow(cy,cm);
+  const todayStr = getTodayJST();
+
+  let h=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+    <button onclick="sideCalMove('${containerId}',${cy},${cm},-1)" style="background:#111820;border:1px solid #1e2d3d;color:#c8d8e8;padding:2px 8px;border-radius:4px;font-size:11px;">◀</button>
+    <span style="font-size:12px;font-weight:700;color:#c8d8e8;">${cy}年${cm}月</span>
+    <button onclick="sideCalMove('${containerId}',${cy},${cm},1)" style="background:#111820;border:1px solid #1e2d3d;color:#c8d8e8;padding:2px 8px;border-radius:4px;font-size:11px;">▶</button>
+  </div>`;
+  h+=`<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;margin-bottom:1px;">`;
+  for(const[d,i] of[["日",0],["月",1],["火",2],["水",3],["木",4],["金",5],["土",6]]){
+    h+=`<div style="text-align:center;font-size:9px;font-weight:700;color:${i===0?"#ff5566":i===6?"#5599ff":"#4a6070"};padding:3px 0;">${d}</div>`;
+  }
+  h+=`</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;">`;
+  for(let i=0;i<firstDow;i++) h+=`<div></div>`;
+  for(let d=1;d<=days;d++){
+    const dow=new Date(cy,cm-1,d).getDay();
+    const isWkend=dow===0||dow===6;
+    const dateStr=`${cy}-${pad2(cm)}-${pad2(d)}`;
+    const isSel=dateStr===selectedDate;
+    const isToday=dateStr===todayStr;
+    const isPast=dateStr<todayStr;
+    let bg=isSel?"var(--accent)":isToday?"rgba(0,229,255,0.2)":"rgba(255,255,255,0.03)";
+    let color=isSel?"#080c10":isToday?"#00e5ff":isWkend?(dow===0?"#ff5566":"#5599ff"):isPast?"#3a5060":"#8090a0";
+    h+=`<div onclick="${!isWkend?`sideCalClick('${containerId}','${dateStr}')`:""}"
+      style="text-align:center;font-size:11px;padding:5px 2px;border-radius:4px;background:${bg};color:${color};
+      cursor:${!isWkend?"pointer":"default"};font-weight:${isSel||isToday?700:400};
+      ${isSel?"box-shadow:0 0 8px var(--accent)44;":""}
+      transition:background .15s;">${d}</div>`;
+  }
+  h+=`</div>`;
+  el.innerHTML=h;
+}
+
+function sideCalMove(containerId, cy, cm, dir){
+  cm+=dir;
+  if(cm>12){cm=1;cy++;}
+  if(cm<1){cm=12;cy--;}
+  // カレンダーを再描画（選択日は維持）
+  const state = calState[containerId]||{};
+  state.cy=cy; state.cm=cm;
+  calState[containerId]=state;
+  buildSideCalendar(containerId, state.selectedDate||null);
+}
+
+async function sideCalClick(containerId, dateStr){
+  const state = calState[containerId]||{};
+  state.selectedDate=dateStr;
+  calState[containerId]=state;
+  buildSideCalendar(containerId, dateStr);
+
+  // キャッシュにあれば即表示
+  if(dayCache[dateStr]){
+    renderCompanyTable(dayCache[dateStr], containerId+"-rank");
+    return;
+  }
+  // なければ取得
+  const el=document.getElementById(containerId+"-rank");
+  if(el) el.innerHTML='<div class="status-box"><div class="spin"></div><div style="font-size:11px;color:#4a6070;margin-top:10px;">取得中...</div></div>';
+  try{
+    const data=await apiGet(`/api/day?date_str=${dateStr}`);
+    const companies=(data.companies||[]).map(c=>{const s=computeScore(c);return{...c,...s,reason:buildReason(c,s.verdict)};});
+    companies.sort((a,b)=>b.confidence-a.confidence);
+    dayCache[dateStr]=companies; // キャッシュ保存
+    renderCompanyTable(companies, containerId+"-rank");
+  }catch(e){
+    if(el) el.innerHTML=`<div style="color:#ff3355;font-size:12px;padding:20px;text-align:center;">⚠️ 取得エラー</div>`;
+  }
+}
+
+const calState = {};
+
+// カレンダー付き2カラムレイアウトでコンテンツを描画
+function renderWithCalendar(companies, containerId){
+  const el=document.getElementById(containerId);
+  if(!el) return;
+
+  // 今日の日付でカレンダー初期化
+  const now=new Date();
+  const todayStr=getTodayJST();
+  calState[containerId]={cy:now.getFullYear(), cm:now.getMonth()+1, selectedDate:todayStr};
+
+  el.innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 200px;gap:16px;align-items:start;">
+      <div id="${containerId}-rank"></div>
+      <div style="background:#0d1318;border:1px solid #1e2d3d;border-radius:8px;padding:12px;position:sticky;top:80px;">
+        <div style="font-size:9px;letter-spacing:2px;color:#4a6070;text-transform:uppercase;margin-bottom:8px;">📅 日付を選択</div>
+        <div id="sidecal-${containerId}"></div>
+        <div style="font-size:9px;color:#2a3a4a;margin-top:8px;text-align:center;">クリックでその日のランキングを表示</div>
+      </div>
+    </div>`;
+
+  renderCompanyTable(companies, containerId+"-rank");
+  buildSideCalendar(containerId, todayStr);
+}
+
+function rankMedal(i){
+  if(i===0) return'<span style="font-size:18px;margin-right:6px;">🥇</span>';
+  if(i===1) return'<span style="font-size:18px;margin-right:6px;">🥈</span>';
+  if(i===2) return'<span style="font-size:18px;margin-right:6px;">🥉</span>';
+  return`<span style="font-family:'Share Tech Mono',monospace;font-size:13px;font-weight:700;color:#4a6070;margin-right:8px;min-width:28px;display:inline-block;text-align:right;">${i+1}</span>`;
+}
+
+function renderCompanyTable(companies,containerId){
+  const el=document.getElementById(containerId);
+  if(!el)return;
+  if(!companies.length){
+    el.innerHTML='<div class="status-box" style="border-color:#ffd70022"><div style="font-size:13px;color:#ffd700;">📭 この期間の決算発表はありません</div></div>';
+    return;
+  }
+  // 儲かる期待値順にソート（上昇系→中立→下落系、各グループ内は上昇期待度順）
+  const verdictOrder = {"stop-high":0,"surge":1,"neutral":2,"fall":3,"stop-low":4};
+  companies.sort((a,b)=>{
+    const oa = verdictOrder[a.verdict]??2;
+    const ob = verdictOrder[b.verdict]??2;
+    if(oa !== ob) return oa - ob;
+    return (b.upside??0) - (a.upside??0);
+  });
+
+  const sh=companies.filter(x=>x.verdict==="stop-high").length;
+  const su=companies.filter(x=>x.verdict==="surge").length;
+  const fa=companies.filter(x=>x.verdict==="fall"||x.verdict==="stop-low").length;
+
+  let h=legendBar();
+  // サマリー
+  h+=`<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">`;
+  for(const[l,v,c] of[["全銘柄",companies.length,"#00e5ff"],["ストップ高候補",sh,"#00ff88"],["上昇期待",su,"#88ffcc"],["下落懸念",fa,"#ff9966"]]){
+    h+=`<div style="background:#0d1318;border:1px solid #1e2d3d;border-radius:6px;padding:8px 14px;"><div style="font-size:9px;color:#4a6070;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;">${l}</div><div style="font-size:22px;font-weight:900;color:${c};">${v}</div></div>`;
+  }
+  h+=`</div>`;
+
+  // ランキングリスト
+  h+=`<div style="display:flex;flex-direction:column;gap:8px;">`;
+  companies.forEach((c,i)=>{
+    const vc=VC[c.verdict];
+    const isTop3=i<3;
+    const borderColor=isTop3?vc+"66":"#1e2d3d";
+    const bgColor=isTop3?vc+"08":"#0d1318";
+    h+=`<div style="background:${bgColor};border:1px solid ${borderColor};border-radius:10px;padding:14px 16px;animation-delay:${i*0.03}s;animation:fadeIn .3s ease both;${isTop3?"box-shadow:0 0 12px "+vc+"22;":""}">
+      <div style="display:flex;align-items:flex-start;gap:12px;">
+        <!-- ランク番号 -->
+        <div style="flex-shrink:0;padding-top:2px;">${rankMedal(i)}</div>
+        <!-- 銘柄情報 -->
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+            <span style="font-family:'Share Tech Mono',monospace;font-size:15px;color:#00e5ff;font-weight:bold;">${c.ticker}</span>
+            <span style="font-size:13px;color:#c8d8e8;font-weight:700;">${c.name}</span>
+            <span title="${VDESC[c.verdict]}" style="display:inline-flex;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:1.5px;border:1px solid ${vc}44;background:${vc}11;color:${vc};">${VL[c.verdict]}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
+            <span style="font-size:10px;color:#4a6070;">${fmtShort(c.date)}</span>
+            <span style="font-size:10px;color:#4a6070;">${c.decision_type||""} ${c.announcement_time?"/ "+c.announcement_time:""}</span>
+            <span style="font-family:'Share Tech Mono',monospace;font-size:11px;color:#c8d8e8;">${c.market_cap||""}</span>
+            <span style="font-size:10px;">${perBadge(c.per)}</span>
+            <span style="font-size:10px;">${roeBadge(c.roe)}</span>
+          </div>
+          <div style="font-size:11px;line-height:1.8;color:#a0b8c8;">${c.reason}</div>
+          ${c.news&&c.news.length?`<div style="margin-top:6px;display:flex;flex-direction:column;gap:2px;">${c.news.slice(0,2).map(n=>`<div style="font-size:10px;color:#4a6070;padding:2px 6px;background:rgba(255,255,255,0.02);border-radius:3px;border-left:2px solid #1e2d3d;">📰 ${n}</div>`).join('')}</div>`:''}
+          ${c.margin_ratio!==undefined?`<div style="margin-top:4px;display:flex;gap:10px;flex-wrap:wrap;">
+            <span style="font-size:10px;color:${c.margin_ratio<2?'#00ff88':c.margin_ratio<5?'#ffd700':'#ff9966'};">信用倍率 ${c.margin_ratio}倍</span>
+            ${c.volume_ratio!==undefined?`<span style="font-size:10px;color:${c.volume_ratio>=2?'#00ff88':c.volume_ratio>=1.5?'#ffd700':'#4a6070'};">出来高 ${c.volume_ratio}x</span>`:''}
+          </div>`:''}
+        </div>
+        <!-- 確信度 -->
+        <div style="flex-shrink:0;text-align:right;min-width:80px;">
+          <!-- 上昇期待度 -->
+          <div style="margin-bottom:8px;">
+            <div style="font-size:9px;color:#4a6070;margin-bottom:3px;letter-spacing:1px;">上昇期待度</div>
+            <div style="font-family:'Share Tech Mono',monospace;font-size:${isTop3?"20":"15"}px;font-weight:900;color:${c.upside>=70?"#00ff88":c.upside>=40?"#ffd700":"#ff9966"};">${c.upside??"-"}%</div>
+            <div style="width:70px;height:4px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;margin-top:4px;">
+              <div style="width:${c.upside??0}%;height:100%;background:${c.upside>=70?"#00ff88":c.upside>=40?"#ffd700":"#ff9966"};border-radius:3px;"></div>
+            </div>
+            ${c.upsideBreakdown&&c.upsideBreakdown.length?`<div style="margin-top:5px;display:flex;flex-direction:column;gap:2px;">
+              ${c.upsideBreakdown.map(b=>`<div style="display:flex;justify-content:space-between;align-items:center;font-size:9px;gap:4px;">
+                <span style="color:#4a6070;white-space:nowrap;">${b.label}</span>
+                <span style="color:${b.color};font-weight:700;font-family:'Share Tech Mono',monospace;">${b.point>0?"+":""}${b.point}</span>
+              </div>`).join("")}
+            </div>`:""}
+          </div>
+          <!-- 確信度 -->
+          <div>
+            <div style="font-size:9px;color:#4a6070;margin-bottom:3px;letter-spacing:1px;">確信度</div>
+            <div style="font-family:'Share Tech Mono',monospace;font-size:${isTop3?"14":"12"}px;font-weight:700;color:${vc};">${c.confidence}%</div>
+            <div style="width:70px;height:3px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;margin-top:4px;">
+              <div style="width:${c.confidence}%;height:100%;background:${vc};border-radius:3px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- AI分析ボタン -->
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(30,45,61,0.5);">
+        <button class="ai-btn"
+          data-ticker="${c.ticker}"
+          data-name="${c.name}"
+          data-upside="${c.upside??0}"
+          data-confidence="${c.confidence??0}"
+          data-verdict="${c.verdict}"
+          data-margin="${c.margin_ratio??'-'}"
+          data-volume="${c.volume_ratio??'-'}"
+          onclick="handleAiBtn(this)"
+          style="background:rgba(0,229,255,0.07);border:1px solid rgba(0,229,255,0.3);color:#00e5ff;padding:5px 14px;border-radius:4px;font-size:11px;letter-spacing:1px;width:100%;cursor:pointer;">🤖 AI分析</button>
+      </div>
+    </div>`;
+  });
+  h+=`</div>`;
+  el.innerHTML=h;
+}
+
+// 当日の決算
+async function loadToday(){
+  document.getElementById("today-reload").style.display="none";
+  const todayStr = getTodayJST();
+  document.getElementById("today-date").textContent = fmtJP(todayStr);
+  document.getElementById("today-content").innerHTML='<div class="status-box"><div class="spin"></div><div style="font-size:12px;color:#4a6070;margin-top:12px;">本日の決算発表企業を取得中...</div></div>';
+  try{
+    const data=await apiGet(`/api/day?date_str=${todayStr}`);
+    const companies=(data.companies||[]).map(c=>{const s=computeScore(c);return{...c,...s,reason:buildReason(c,s.verdict)};});
+    companies.sort((a,b)=>b.confidence-a.confidence);
+    if(!companies.length){
+      document.getElementById("today-content").innerHTML='<div class="status-box" style="border-color:#ffd70022"><div style="font-size:28px;margin-bottom:10px;">📭</div><div style="font-size:13px;color:#ffd700;">本日の決算発表はありません</div></div>';
+    } else {
+      renderWithCalendar(companies,"today-content");
+  savePredictions(getTodayJST(), companies);
+  enrichCompanies([...companies],"today-content");
+    }
+    document.getElementById("today-reload").style.display="inline-block";
+  }catch(e){
+    document.getElementById("today-content").innerHTML=`<div class="status-box" style="border-color:#ff335533"><div style="color:#ff3355;font-size:13px;margin-bottom:6px;">⚠️ ${e.message}</div><button onclick="loadToday()" style="background:rgba(0,229,255,0.07);border:1px solid #00e5ff;color:#00e5ff;padding:5px 14px;border-radius:4px;font-size:11px;">再試行</button></div>`;
+    document.getElementById("today-reload").style.display="inline-block";
+  }
+}
+
+// 翌営業日
+async function loadTomorrow(){
+  document.getElementById("tomorrow-content").innerHTML='<div class="status-box"><div class="spin"></div><div style="font-size:12px;color:#4a6070;margin-top:12px;">翌営業日の決算企業を取得中...</div><div style="font-size:10px;color:#2a3a4a;margin-top:4px;">初回は50秒ほどかかる場合があります</div></div>';
+  try{
+    const data=await apiGet("/api/next");
+    document.getElementById("next-date").textContent=data.date?fmtJP(data.date):"";
+    const companies=(data.companies||[]).map(c=>{const s=computeScore(c);return{...c,...s,reason:buildReason(c,s.verdict)};});
+    companies.sort((a,b)=>b.confidence-a.confidence);
+    renderWithCalendar(companies,"tomorrow-content");
+  savePredictions(data.date, companies);
+  enrichCompanies([...companies],"tomorrow-content");
+  }catch(e){
+    document.getElementById("tomorrow-content").innerHTML=`<div class="status-box" style="border-color:#ff335533"><div style="color:#ff3355;font-size:13px;margin-bottom:6px;">⚠️ ${e.message}</div><div style="font-size:10px;color:#4a6070;margin-bottom:12px;">初回は50秒ほどかかります。しばらく待ってから再試行してください。</div><button onclick="loadTomorrow()" style="background:rgba(0,229,255,0.07);border:1px solid #00e5ff;color:#00e5ff;padding:5px 14px;border-radius:4px;font-size:11px;">再試行</button></div>`;
+    document.getElementById("today-reload").style.display="inline-block";
+  }
+}
+
+// 先N営業日
+async function loadWeek(n,contentId,datesId){
+  const bizDays=getBizDays(now,n);
+  document.getElementById(datesId).textContent=`${fmtShort(bizDays[0].toISOString().slice(0,10))} 〜 ${fmtShort(bizDays[bizDays.length-1].toISOString().slice(0,10))}`;
+  document.getElementById(contentId).innerHTML='<div class="status-box"><div class="spin"></div><div style="font-size:12px;color:#4a6070;margin-top:12px;">取得中...</div></div>';
+  try{
+    const allCompanies=[];
+    for(const d of bizDays){
+      const dateStr=d.toISOString().slice(0,10);
+      try{
+        const data=await apiGet(`/api/day?date_str=${dateStr}`);
+        (data.companies||[]).forEach(c=>{const s=computeScore(c);allCompanies.push({...c,...s,reason:buildReason(c,s.verdict)});});
+      }catch(e){}
+    }
+    allCompanies.sort((a,b)=>a.date!==b.date?a.date.localeCompare(b.date):b.confidence-a.confidence);
+    renderWithCalendar(allCompanies,contentId);
+  }catch(e){
+    document.getElementById(contentId).innerHTML=`<div class="status-box" style="border-color:#ff335533"><div style="color:#ff3355;font-size:13px;">⚠️ ${e.message}</div></div>`;
+  }
+}
+
+// 注目株
+async function loadSpotlight(){
+  document.getElementById("spotlight-content").innerHTML='<div class="status-box"><div class="spin"></div><div style="font-size:12px;color:#4a6070;margin-top:12px;">当月・翌月の注目株を抽出中...</div></div>';
+  try{
+    const months=[];
+    months.push({y:now.getFullYear(),m:now.getMonth()+1});
+    const nm=now.getMonth()===11?{y:now.getFullYear()+1,m:1}:{y:now.getFullYear(),m:now.getMonth()+2};
+    months.push(nm);
+    const allCompanies=[];
+    for(const{y,m} of months){
+      try{
+        const data=await apiGet(`/api/month?year=${y}&month=${m}`);
+        for(const day of(data.days||[])){
+          try{
+            const d=await apiGet(`/api/day?date_str=${day.date}`);
+            (d.companies||[]).forEach(c=>{
+              const s=computeScore(c);
+              if(s.confidence>=75){allCompanies.push({...c,...s,reason:buildReason(c,s.verdict)});}
+            });
+          }catch(e){}
+        }
+      }catch(e){}
+    }
+    if(!allCompanies.length){
+      document.getElementById("spotlight-content").innerHTML='<div class="status-box" style="border-color:#ffd70022"><div style="font-size:28px;margin-bottom:10px;">📭</div><div style="font-size:13px;color:#ffd700;">現時点で注目株が見つかりませんでした</div><div style="font-size:10px;color:#2a3a4a;margin-top:6px;">決算集中期（4〜6月・10〜11月）に多くの候補が出ます</div></div>';
+      return;
+    }
+    allCompanies.sort((a,b)=>b.confidence-a.confidence);
+    renderCompanyTable(allCompanies.slice(0,20),"spotlight-content");
+  }catch(e){
+    document.getElementById("spotlight-content").innerHTML=`<div class="status-box" style="border-color:#ff335533"><div style="color:#ff3355;font-size:13px;">⚠️ ${e.message}</div></div>`;
+  }
+}
+
+// ストップ高（今日）
+async function loadStopHighToday(){
+  const el=document.getElementById("sh-today-content");
+  el.innerHTML='<div class="status-box"><div class="spin"></div><div style="font-size:12px;color:#4a6070;margin-top:12px;">本日のストップ高銘柄を取得中...</div></div>';
+  try{
+    const data=await apiGet("/api/stophigh/today");
+    const stocks=data.stocks||[];
+    if(!stocks.length){
+      el.innerHTML='<div class="status-box" style="border-color:#ffd70022"><div style="font-size:13px;color:#ffd700;">📭 本日のストップ高銘柄はまだありません</div></div>';
+      return;
+    }
+    let h=`<div style="background:#0d1318;border:1px solid #00ff8833;border-radius:8px;padding:10px 16px;margin-bottom:12px;display:flex;align-items:center;gap:10px;">
+      <span style="font-size:18px;">🚀</span>
+      <span style="font-size:13px;color:#00ff88;font-weight:700;">${stocks.length}銘柄がストップ高！</span>
+      <span style="font-size:11px;color:#4a6070;">${data.date}</span>
+    </div>`;
+    h+=`<div style="background:#0d1318;border:1px solid #1e2d3d;border-radius:8px;overflow:hidden;"><table><thead><tr style="background:#0a1018;">`;
+    for(const th of["銘柄コード","企業名","株価","変動率","出来高"]){
+      h+=`<th style="padding:10px 14px;text-align:left;font-size:9px;letter-spacing:2px;color:#4a6070;text-transform:uppercase;border-bottom:1px solid #1e2d3d;font-weight:400;">${th}</th>`;
+    }
+    h+=`</tr></thead><tbody>`;
+    stocks.forEach((s,i)=>{
+      h+=`<tr style="border-bottom:1px solid rgba(30,45,61,0.5);animation-delay:${i*0.03}s;">
+        <td style="padding:12px 14px;font-family:'Share Tech Mono',monospace;font-size:13px;color:#00e5ff;font-weight:bold;">${s.ticker}</td>
+        <td style="padding:12px 14px;font-size:12px;color:#c8d8e8;">${s.name}</td>
+        <td style="padding:12px 14px;font-family:'Share Tech Mono',monospace;font-size:12px;">${s.price||"─"}</td>
+        <td style="padding:12px 14px;font-family:'Share Tech Mono',monospace;font-size:12px;color:#00ff88;font-weight:700;">${s.change||"S高"}</td>
+        <td style="padding:12px 14px;font-size:11px;color:#4a6070;">${s.volume||"─"}</td>
+      </tr>`;
+    });
+    h+=`</tbody></table></div>`;
+    el.innerHTML=h;
+  }catch(e){
+    el.innerHTML=`<div class="status-box" style="border-color:#ff335533"><div style="color:#ff3355;font-size:13px;margin-bottom:10px;">⚠️ ${e.message}</div><button onclick="loadStopHighToday()" style="background:rgba(0,229,255,0.07);border:1px solid #00e5ff;color:#00e5ff;padding:5px 14px;border-radius:4px;font-size:11px;">再試行</button></div>`;
+  }
+}
+
+// 決算後ストップ高
+async function loadStopHighAfter(){
+  const el=document.getElementById("sh-after-content");
+  el.innerHTML='<div class="status-box"><div class="spin"></div><div style="font-size:12px;color:#4a6070;margin-top:12px;">過去30日の決算発表銘柄とストップ高を照合中...</div></div>';
+  try{
+    const data=await apiGet("/api/stophigh/after_earnings?days=30");
+    const stocks=data.stocks||[];
+    if(!stocks.length){
+      el.innerHTML='<div class="status-box" style="border-color:#ffd70022"><div style="font-size:13px;color:#ffd700;">📭 過去30日間で決算後ストップ高になった銘柄はありません</div><div style="font-size:10px;color:#2a3a4a;margin-top:6px;">決算集中期（5月・8月・11月・2月）に多く発生します</div></div>';
+      return;
+    }
+    let h=`<div style="background:#0d1318;border:1px solid #00ff8833;border-radius:8px;padding:10px 16px;margin-bottom:12px;">
+      <span style="font-size:13px;color:#00ff88;font-weight:700;">📈 過去30日間で${stocks.length}銘柄が決算後ストップ高！</span>
+    </div>`;
+    h+=`<div style="background:#0d1318;border:1px solid #1e2d3d;border-radius:8px;overflow:hidden;"><table><thead><tr style="background:#0a1018;">`;
+    for(const th of["決算日","ストップ高日","銘柄","決算種別","時価総額 / PER・ROE"]){
+      h+=`<th style="padding:10px 14px;text-align:left;font-size:9px;letter-spacing:2px;color:#4a6070;text-transform:uppercase;border-bottom:1px solid #1e2d3d;font-weight:400;">${th}</th>`;
+    }
+    h+=`</tr></thead><tbody>`;
+    stocks.forEach((s,i)=>{
+      h+=`<tr style="border-bottom:1px solid rgba(30,45,61,0.5);animation-delay:${i*0.03}s;">
+        <td style="padding:12px 14px;font-size:11px;color:#c8d8e8;white-space:nowrap;">${fmtShort(s.earnings_date)}</td>
+        <td style="padding:12px 14px;white-space:nowrap;"><span style="font-size:11px;color:#00ff88;font-weight:700;">🚀 ${fmtShort(s.stophigh_date)}</span></td>
+        <td style="padding:12px 14px;">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:13px;color:#00e5ff;font-weight:bold;">${s.ticker}</div>
+          <div style="font-size:12px;color:#c8d8e8;margin-top:1px;">${s.name}</div>
+        </td>
+        <td style="padding:12px 14px;font-size:11px;color:#4a6070;">${s.decision_type||"─"}</td>
+        <td style="padding:12px 14px;">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:11px;">${s.market_cap||"─"}</div>
+          <div style="font-size:10px;margin-top:3px;">${perBadge(s.per)} ${roeBadge(s.roe)}</div>
+        </td>
+      </tr>`;
+    });
+    h+=`</tbody></table></div>`;
+    el.innerHTML=h;
+  }catch(e){
+    el.innerHTML=`<div class="status-box" style="border-color:#ff335533"><div style="color:#ff3355;font-size:13px;margin-bottom:10px;">⚠️ ${e.message}</div><button onclick="loadStopHighAfter()" style="background:rgba(0,229,255,0.07);border:1px solid #00e5ff;color:#00e5ff;padding:5px 14px;border-radius:4px;font-size:11px;">再試行</button></div>`;
+  }
+}
+
+// カレンダー
+async function loadCalendar(y,m){
+  calYear=y;calMonth=m;
+  document.getElementById("cal-label").textContent=`${y}年${m}月`;
+  document.getElementById("cal-count").textContent="取得中...";
+  document.getElementById("cal-content").innerHTML=`<div class="status-box"><div class="spin"></div><div style="font-size:12px;color:#4a6070;margin-top:12px;">${y}年${m}月のカレンダーを取得中...</div></div>`;
+  try{
+    const data=await apiGet(`/api/month?year=${y}&month=${m}`);
+    dayCounts=data.days||[];
+    document.getElementById("cal-count").textContent=`${dayCounts.reduce((s,x)=>s+x.count,0)}社 / ${dayCounts.length}営業日`;
+    renderCalendar();
+  }catch(e){
+    document.getElementById("cal-content").innerHTML=`<div class="status-box" style="border-color:#ff335533"><div style="color:#ff3355;font-size:13px;margin-bottom:10px;">⚠️ 取得に失敗しました</div><button onclick="loadCalendar(${y},${m})" style="background:rgba(0,229,255,0.07);border:1px solid #00e5ff;color:#00e5ff;padding:5px 14px;border-radius:4px;font-size:11px;">再試行</button></div>`;
+    document.getElementById("cal-count").textContent="";
+  }
+}
+
+function getCount(d){return dayCounts.find(x=>x.date===`${calYear}-${pad2(calMonth)}-${pad2(d)}`)?.count||0;}
+
+function renderCalendar(){
+  const days=getDays(calYear,calMonth),firstDow=getFirstDow(calYear,calMonth);
+  const todayD=now.getDate(),todayM=now.getMonth()+1,todayY=now.getFullYear();
+  let g=`<div style="display:grid;grid-template-columns:repeat(7,1fr);background:#0a1018;border-bottom:1px solid #1e2d3d;">`;
+  for(const[d,i] of[["日",0],["月",1],["火",2],["水",3],["木",4],["金",5],["土",6]]){
+    g+=`<div style="padding:8px 0;text-align:center;font-size:10px;letter-spacing:1px;font-weight:700;color:${i===0?"#ff5566":i===6?"#5599ff":"#4a6070"};">${d}</div>`;
+  }
+  g+=`</div><div style="display:grid;grid-template-columns:repeat(7,1fr);">`;
+  for(let i=0;i<firstDow;i++)g+=`<div style="min-height:70px;border-right:1px solid #1a2530;border-bottom:1px solid #1a2530;"></div>`;
+  for(let d=1;d<=days;d++){
+    const dow=new Date(calYear,calMonth-1,d).getDay();
+    const isWkend=dow===0||dow===6,isSel=d===selectedDay;
+    const isToday=d===todayD&&calMonth===todayM&&calYear===todayY;
+    const isPast=new Date(calYear,calMonth-1,d)<new Date(todayY,todayM-1,todayD);
+    const count=!isWkend?getCount(d):0;
+    const intensity=count?Math.min(1,count/300):0;
+    const bg=isSel?"rgba(0,229,255,0.12)":count?isPast?`rgba(80,130,160,${0.1+intensity*0.3})`:`rgba(0,229,255,${0.06+intensity*0.22})`:"transparent";
+    g+=`<div onclick="${!isWkend?`handleDayClick(${d})`:""}" style="min-height:70px;padding:5px 6px;border-right:1px solid #1a2530;border-bottom:1px solid #1a2530;background:${bg};cursor:${!isWkend?"pointer":"default"};transition:background .15s;opacity:${isWkend?0.2:1};">
+      <div style="font-size:11px;font-family:'Share Tech Mono',monospace;margin-bottom:2px;font-weight:${isToday?700:400};color:${isToday?"#00e5ff":isWkend?(dow===0?"#ff5566":"#5599ff"):isPast?"#3a5060":"#5a7080"};">
+        ${isToday?`<span style="background:#00e5ff;color:#080c10;border-radius:10px;padding:0 5px;font-size:10px;">${d}</span>`:d}
+      </div>
+      ${!isWkend&&count>0?`<div style="font-size:11px;font-weight:700;color:${isPast?"#5a8090":"#00cfee"};margin-top:1px;">${count}社</div>`:""}
+      ${!isWkend&&count===0?`<div style="font-size:8px;color:#1e2d3d;margin-top:2px;">─</div>`:""}
+    </div>`;
+  }
+  g+=`</div>`;
+  document.getElementById("cal-content").innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 300px;gap:16px;">
+      <div style="background:#0d1318;border:1px solid #1e2d3d;border-radius:8px;overflow:hidden;">${g}</div>
+      <div id="day-panel" style="background:#0d1318;border:1px solid #1e2d3d;border-radius:8px;padding:14px;align-self:start;max-height:540px;overflow:auto;">
+        <div style="font-size:11px;color:#2a3a4a;text-align:center;padding:30px 0;line-height:1.8;">日付をクリックすると<br/>決算発表企業が<br/>表示されます</div>
+      </div>
+    </div>`;
+}
+
+async function handleDayClick(d){
+  if(d===selectedDay){selectedDay=null;renderCalendar();return;}
+  selectedDay=d;renderCalendar();
+  const panel=document.getElementById("day-panel");
+  panel.innerHTML=`<div style="font-size:10px;letter-spacing:2px;color:#4a6070;margin-bottom:10px;text-transform:uppercase;">${calMonth}月${d}日（${getCount(d)}社）</div><div style="text-align:center;padding:20px;"><div class="spin"></div></div>`;
+  try{
+    const data=await apiGet(`/api/day?date_str=${calYear}-${pad2(calMonth)}-${pad2(d)}`);
+    const list=data.companies||[];
+    let h=`<div style="font-size:10px;letter-spacing:2px;color:#4a6070;margin-bottom:10px;text-transform:uppercase;">${calMonth}月${d}日（${list.length}社）</div>`;
+    if(!list.length)h+=`<div style="font-size:11px;color:#2a3a4a;">この日の決算発表はありません</div>`;
+    else list.forEach(c=>{h+=`<div style="padding:8px 0;border-bottom:1px solid #1a2530;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;"><span style="font-family:'Share Tech Mono',monospace;font-size:12px;color:#00e5ff;font-weight:bold;">${c.ticker}</span><span style="font-size:9px;padding:1px 5px;border-radius:2px;background:rgba(255,255,255,0.04);border:1px solid #1e2d3d;color:#4a6070;">${c.decision_type||""}</span></div><div style="font-size:11px;color:#c8d8e8;">${c.name}</div><div style="font-size:9px;color:#3a5060;margin-top:2px;">${c.market_cap||""}${c.announcement_time?" / "+c.announcement_time:""}</div></div>`;});
+    panel.innerHTML=h;
+  }catch(e){panel.innerHTML=`<div style="color:#ff3355;font-size:12px;">取得エラー</div>`;}
+}
+
+function prevMonth(){calMonth===1?loadCalendar(calYear-1,12):loadCalendar(calYear,calMonth-1);}
+function nextMonth(){calMonth===12?loadCalendar(calYear+1,1):loadCalendar(calYear,calMonth+1);}
+
+
+// ── バックグラウンド追加データ取得 ──
+async function enrichCompanies(companies, containerId){
+  // 1銘柄ずつ順次取得して表示を更新
+  for(let i=0; i<companies.length; i++){
+    const c = companies[i];
+    try{
+      const extra = await apiGet(`/api/enrich/${c.ticker}`);
+      // 追加スコアを上昇期待度に反映
+      companies[i] = {
+        ...c,
+        margin_ratio: extra.margin_ratio,
+        volume_ratio: extra.volume_ratio,
+        news: extra.news||[],
+        news_score: extra.news_score||0,
+        margin_score: extra.margin_score||0,
+        volume_score: extra.volume_score||0,
+        extra_score: extra.extra_score||0,
+        // 上昇期待度を更新（元の値+追加スコアを加味）
+        upside: Math.min(100, Math.max(0, (c.upside||0) + Math.round((extra.extra_score||0)*0.5))),
+      };
+
+      // 判定も更新
+      const newUpside = companies[i].upside;
+      // ソート更新
+      const verdictOrder = {"stop-high":0,"surge":1,"neutral":2,"fall":3,"stop-low":4};
+      companies.sort((a,b)=>{
+        const oa=verdictOrder[a.verdict]??2, ob=verdictOrder[b.verdict]??2;
+        if(oa!==ob) return oa-ob;
+        return (b.upside??0)-(a.upside??0);
+      });
+
+      // 表示を即座に更新
+      renderCompanyTable(companies, containerId+"-rank");
+    }catch(e){
+      // エラーは無視して次へ
+    }
+  }
+}
+
+// ── 8段階判定 ──
+function getStage(pct){
+  if(pct===null||pct===undefined) return{label:"─",color:"#4a6070"};
+  if(pct>=15)  return{label:"S高", color:"#00ff88"};
+  if(pct>=10)  return{label:"+++", color:"#00dd66"};
+  if(pct>=5)   return{label:"++",  color:"#88ffcc"};
+  if(pct>=0)   return{label:"+",   color:"#aaffdd"};
+  if(pct>=-5)  return{label:"-",   color:"#ffcc88"};
+  if(pct>=-10) return{label:"--",  color:"#ff9966"};
+  if(pct>=-15) return{label:"---", color:"#ff5544"};
+  return            {label:"S安",  color:"#ff3355"};
+}
+
+// ── 予測自動保存 ──
+async function savePredictions(date_str, companies){
+  try{
+    await fetch(BACKEND+"/api/prediction/save",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        date:date_str,
+        companies:companies.map(c=>({ticker:c.ticker,name:c.name,verdict:c.verdict,upside:c.upside,confidence:c.confidence}))
+      })
+    });
+  }catch(e){console.log("予測保存エラー:",e);}
+}
+
+// ── 的中率取得・表示 ──
+async function loadAccuracy(){
+  const el=document.getElementById("accuracy-content");
+  el.innerHTML='<div class="status-box"><div class="spin"></div><div style="font-size:12px;color:#4a6070;margin-top:12px;">的中率を計算中...</div><div style="font-size:10px;color:#2a3a4a;margin-top:4px;">株価データを取得しています</div></div>';
+  try{
+    const data=await apiGet("/api/prediction/verify?days=30");
+    const {results,summary}=data;
+    if(!results||results.length===0){
+      el.innerHTML='<div class="status-box"><div style="font-size:28px;margin-bottom:10px;">📊</div><div style="font-size:13px;color:#c8d8e8;margin-bottom:8px;">まだ検証できるデータがありません</div><div style="font-size:11px;color:#4a6070;">翌営業日以降に的中率が表示されます</div></div>';
+      return;
+    }
+    const rateColor=summary.rate>=60?"#00ff88":summary.rate>=40?"#ffd700":"#ff9966";
+    const stages=[["S高","+15%以上","#00ff88"],["+++","+10〜15%","#00dd66"],["++","+5〜10%","#88ffcc"],["+","0〜+5%","#aaffdd"],["-","0〜-5%","#ffcc88"],["--","-5〜-10%","#ff9966"],["---","-10〜-15%","#ff5544"],["S安","-15%以下","#ff3355"]];
+    let h=`
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;">
+      <div style="background:#0d1318;border:1px solid #00e5ff33;border-radius:8px;padding:16px;text-align:center;">
+        <div style="font-size:10px;color:#4a6070;letter-spacing:2px;margin-bottom:6px;">総合的中率</div>
+        <div style="font-size:36px;font-weight:900;color:${rateColor};">${summary.rate}%</div>
+        <div style="font-size:10px;color:#4a6070;margin-top:4px;">${summary.hit}/${summary.total}件</div>
+      </div>
+      <div style="background:#0d1318;border:1px solid #00ff8833;border-radius:8px;padding:16px;text-align:center;">
+        <div style="font-size:10px;color:#4a6070;letter-spacing:2px;margin-bottom:6px;">期待度70%+</div>
+        <div style="font-size:28px;font-weight:900;color:#00ff88;">${summary.by_upside.high_70plus.rate}%</div>
+        <div style="font-size:10px;color:#4a6070;margin-top:4px;">${summary.by_upside.high_70plus.count}件</div>
+      </div>
+      <div style="background:#0d1318;border:1px solid #ffd70033;border-radius:8px;padding:16px;text-align:center;">
+        <div style="font-size:10px;color:#4a6070;letter-spacing:2px;margin-bottom:6px;">期待度40-70%</div>
+        <div style="font-size:28px;font-weight:900;color:#ffd700;">${summary.by_upside.mid_40_70.rate}%</div>
+        <div style="font-size:10px;color:#4a6070;margin-top:4px;">${summary.by_upside.mid_40_70.count}件</div>
+      </div>
+      <div style="background:#0d1318;border:1px solid #ff996633;border-radius:8px;padding:16px;text-align:center;">
+        <div style="font-size:10px;color:#4a6070;letter-spacing:2px;margin-bottom:6px;">期待度40%未満</div>
+        <div style="font-size:28px;font-weight:900;color:#ff9966;">${summary.by_upside.low_under40.rate}%</div>
+        <div style="font-size:10px;color:#4a6070;margin-top:4px;">${summary.by_upside.low_under40.count}件</div>
+      </div>
+    </div>
+    <div style="background:#0d1318;border:1px solid #1e2d3d;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <span style="font-size:10px;color:#4a6070;letter-spacing:1px;margin-right:4px;">翌日株価：</span>
+      ${stages.map(([l,r,c])=>`<span style="font-family:'Share Tech Mono',monospace;font-size:12px;font-weight:700;color:${c};">${l}<span style="font-size:9px;color:#4a6070;font-weight:400;margin-left:2px;">${r}</span></span>`).join('<span style="color:#2a3a4a;margin:0 2px;">|</span>')}
+    </div>
+    <div style="background:#0d1318;border:1px solid #1e2d3d;border-radius:8px;overflow:hidden;"><table><thead><tr style="background:#0a1018;">`;
+    for(const th of["決算日","銘柄","AI判定","上昇期待度","翌日結果","的中"]){
+      h+=`<th style="padding:10px 14px;text-align:left;font-size:9px;letter-spacing:2px;color:#4a6070;text-transform:uppercase;border-bottom:1px solid #1e2d3d;font-weight:400;">${th}</th>`;
+    }
+    h+=`</tr></thead><tbody>`;
+    results.forEach((r,i)=>{
+      const vc=VC[r.verdict]||"#888";
+      const stage=getStage(r.change_pct);
+      const upsideColor=r.upside>=70?"#00ff88":r.upside>=40?"#ffd700":"#ff9966";
+      const hitMark=r.is_hit?'<span style="color:#00ff88;font-size:16px;">✅</span>':'<span style="color:#ff3355;font-size:16px;">❌</span>';
+      h+=`<tr style="border-bottom:1px solid rgba(30,45,61,0.5);animation-delay:${i*0.02}s;">
+        <td style="padding:10px 14px;font-size:11px;color:#c8d8e8;white-space:nowrap;">${fmtShort(r.earnings_date)}</td>
+        <td style="padding:10px 14px;">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:12px;color:#00e5ff;font-weight:bold;">${r.ticker}</div>
+          <div style="font-size:11px;color:#c8d8e8;">${r.name}</div>
+        </td>
+        <td style="padding:10px 14px;">
+          <span style="display:inline-flex;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;border:1px solid ${vc}44;background:${vc}11;color:${vc};">${VL[r.verdict]||r.verdict}</span>
+        </td>
+        <td style="padding:10px 14px;">
+          <span style="font-family:'Share Tech Mono',monospace;font-size:13px;font-weight:700;color:${upsideColor};">${r.upside}%</span>
+        </td>
+        <td style="padding:10px 14px;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-family:'Share Tech Mono',monospace;font-size:16px;font-weight:900;color:${stage.color};">${stage.label}</span>
+            <span style="font-family:'Share Tech Mono',monospace;font-size:11px;color:${stage.color};">${r.change_pct!==null?(r.change_pct>0?"+":"")+r.change_pct+"%":"─"}</span>
+          </div>
+          <div style="font-size:9px;color:#4a6070;margin-top:2px;">${r.open??"-"}→${r.close??"-"}</div>
+        </td>
+        <td style="padding:10px 14px;text-align:center;">${hitMark}</td>
+      </tr>`;
+    });
+    h+=`</tbody></table></div>`;
+    el.innerHTML=h;
+  }catch(e){
+    el.innerHTML=`<div class="status-box" style="border-color:#ff335533"><div style="color:#ff3355;font-size:13px;margin-bottom:10px;">⚠️ ${e.message}</div><button onclick="loadAccuracy()" style="background:rgba(0,229,255,0.07);border:1px solid #00e5ff;color:#00e5ff;padding:5px 14px;border-radius:4px;font-size:11px;">再試行</button></div>`;
+  }
+}
+
+
+// ── AIボタンハンドラー（data属性から値を取得）──
+function handleAiBtn(btn){
+  const ticker = btn.dataset.ticker;
+  const name = btn.dataset.name;
+  const upside = parseInt(btn.dataset.upside)||0;
+  const confidence = parseInt(btn.dataset.confidence)||0;
+  const verdict = btn.dataset.verdict;
+  const margin = btn.dataset.margin;
+  const volume = btn.dataset.volume;
+  // newsはdata属性に入れにくいので空で渡す
+  analyzeStock(ticker, name, upside, confidence, verdict, [], margin, volume, btn);
+}
+
+// ── AI分析（claude.ai API使用・追加料金なし）──
+async function analyzeStock(ticker, name, upside, confidence, verdict, news, marginRatio, volumeRatio, btnEl){
+  const verdictJP = {"stop-high":"ストップ高","surge":"上昇期待","neutral":"中立","fall":"下落懸念","stop-low":"ストップ安"};
+  const newsText = news && news.length ? news.join("\n・") : "なし";
+
+  // ボタンをローディング状態に
+  const origText = btnEl.textContent;
+  btnEl.textContent = "🤖 AI分析中...";
+  btnEl.disabled = true;
+  btnEl.style.opacity = "0.6";
+
+  // 結果表示エリアを作成
+  const resultId = "ai-result-"+ticker;
+  let resultEl = document.getElementById(resultId);
+  if(!resultEl){
+    resultEl = document.createElement("div");
+    resultEl.id = resultId;
+    resultEl.style.cssText = "margin-top:8px;padding:10px 12px;background:rgba(0,229,255,0.05);border:1px solid rgba(0,229,255,0.2);border-radius:6px;font-size:12px;line-height:1.8;color:#c8d8e8;";
+    btnEl.parentNode.insertBefore(resultEl, btnEl.nextSibling);
+  }
+  resultEl.innerHTML = '<div style="display:flex;align-items:center;gap:8px;"><div class="spin"></div><span style="color:#4a6070;font-size:11px;">AIが分析中...</span></div>';
+
+  const prompt = `日本株アナリストとして、以下の決算銘柄を分析してください。
+
+【銘柄】${ticker} ${name}
+【AI判定】${verdictJP[verdict]||verdict}
+【上昇期待度】${upside}%
+【確信度】${confidence}%
+【信用倍率】${marginRatio}倍
+【出来高変化率】${volumeRatio}x（過去5日平均比）
+【直近ニュース】
+・${newsText}
+
+上記データと最新の市場情報を踏まえて、翌営業日の株価動向について投資家目線で3〜4文の日本語で説明してください。数値を引用しながら、上昇・下落の根拠を具体的に述べてください。`;
+
+  try{
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 400,
+        tools: [{type:"web_search_20250305", name:"web_search"}],
+        messages: [{role:"user", content:prompt}]
+      })
+    });
+    const data = await res.json();
+    const text = data.content?.find(b=>b.type==="text")?.text || "分析できませんでした";
+
+    resultEl.innerHTML = `
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+        <span style="font-size:10px;color:#00e5ff;font-weight:700;letter-spacing:1px;">✦ AI分析</span>
+        <span style="font-size:9px;color:#2a3a4a;">claude.ai powered</span>
+      </div>
+      <div style="font-size:12px;line-height:1.85;color:#c8d8e8;">${text}</div>`;
+
+    btnEl.textContent = "🤖 再分析";
+  }catch(e){
+    resultEl.innerHTML = `<div style="color:#ff3355;font-size:11px;">⚠️ 分析エラー: ${e.message}</div>`;
+    btnEl.textContent = origText;
+  }
+
+  btnEl.disabled = false;
+  btnEl.style.opacity = "1";
+}
+
+
+// 起動時は当日だけ読み込む
+loaded['today']=true;
+loadToday();
+</script>
+</body>
+</html>
+  <!-- 的中率タブ -->
+  <div id="tab-accuracy" class="tab-panel">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+      <div style="font-size:17px;font-weight:900;letter-spacing:2px;color:#00e5ff;">📊 予測的中率レポート</div>
+      <button onclick="loadAccuracy()" style="background:rgba(0,229,255,0.07);border:1px solid #00e5ff;color:#00e5ff;padding:5px 14px;border-radius:4px;font-size:11px;">🔄 更新</button>
+    </div>
+    <div id="accuracy-content">
+      <div class="status-box">
+        <div style="font-size:28px;margin-bottom:10px;">📊</div>
+        <div style="font-size:13px;color:#c8d8e8;margin-bottom:8px;">予測データがまだありません</div>
+        <div style="font-size:11px;color:#4a6070;">各タブで銘柄を閲覧すると自動的に予測が保存されます。<br>翌営業日以降に的中率を確認できます。</div>
+      </div>
+    </div>
+  </div>
+
+
