@@ -183,9 +183,9 @@ async def get_stophigh_today():
     # table:2が銘柄テーブル（デバッグで確認済み）
     tables = soup.find_all("table")
     target_table = None
-    for table in tables:
+for table in tables:
         headers = table.find("tr")
-        if headers and "銘柄名" in headers.get_text():
+        if headers and ("銘柄名" in headers.get_text() or "銘柄" in headers.get_text()):
             target_table = table
             break
     if not target_table:
