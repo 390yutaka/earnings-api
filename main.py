@@ -59,7 +59,8 @@ def parse_irbank(html: str, date_str: str) -> list:
         ticker = link.get_text(strip=True)
         if not re.match(r"^\d{4}$", ticker):
             continue
-        name          = cols[1].get_text(strip=True) if len(cols) > 1 else ""
+        name_el = cols[1].find("a")
+        name = name_el.get_text(strip=True) if name_el else cols[1].get_text(strip=True) if len(cols) > 1 else ""
         decision_type = cols[2].get_text(strip=True) if len(cols) > 2 else ""
         ann_time      = cols[3].get_text(strip=True) if len(cols) > 3 else ""
         market_cap    = cols[4].get_text(strip=True) if len(cols) > 4 else ""
