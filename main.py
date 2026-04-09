@@ -180,7 +180,17 @@ async def get_stophigh_today():
         r.raise_for_status()
     soup = BeautifulSoup(r.text, "html.parser")
     results = []
-    for row in soup.select("table tr"):
+    # table:2が銘柄テーブル（デバッグで確認済み）
+    tables = soup.find_all("table")
+    target_table = None
+    for table in tables:
+        headers = table.find("tr")
+        if headers and "銘柄名" in headers.get_text():
+            target_table = table
+            break
+    if not target_table:
+        return {"date": date.today().strftime("%Y-%m-%d"), "stocks": []}
+    for row in target_table.find_all("tr")[1:]:
         cols = row.find_all("td")
         if len(cols) < 4:
             continue
@@ -190,16 +200,12 @@ async def get_stophigh_today():
         ticker = re.sub(r"\D", "", code_el.get_text())
         if not re.match(r"^\d{4}$", ticker):
             continue
-        # 企業名は2列目（cols[1]）に固定
-        name = cols[1].get_text(strip=True) if len(cols) > 1 else ""
-        if not name and len(cols) > 1:
-            name = cols[1].get_text(strip=True)
-        price  = cols[3].get_text(strip=True) if len(cols) > 3 else ""
-        change = cols[4].get_text(strip=True) if len(cols) > 4 else ""
-        volume = cols[6].get_text(strip=True) if len(cols) > 6 else ""
+        name   = cols[1].get_text(strip=True) if len(cols) > 1 else ""
+        price  = cols[4].get_text(strip=True) if len(cols) > 4 else ""
+        change = cols[7].get_text(strip=True) if len(cols) > 7 else ""
         results.append({
             "ticker": ticker, "name": name,
-            "price": price, "change": change, "volume": volume,
+            "price": price, "change": change, "volume": "",
             "date": date.today().strftime("%Y-%m-%d")
         })
     return {"date": date.today().strftime("%Y-%m-%d"), "stocks": results}
