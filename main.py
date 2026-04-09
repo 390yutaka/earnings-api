@@ -24,6 +24,7 @@ HEADERS = {
 }
 
 PREDICTIONS_FILE = "/tmp/predictions.json"
+GAS_URL = "https://script.google.com/macros/s/AKfycbxLejWYi8Z3HR9MJPz690hID-84tFq47s4sJIiC9QwcTVkzN9nxyIpDhMmvibEoLdFf/exec"
 
 def load_predictions():
     if os.path.exists(PREDICTIONS_FILE):
@@ -34,6 +35,28 @@ def load_predictions():
 def save_predictions(data):
     with open(PREDICTIONS_FILE, "w") as f:
         json.dump(data, f, ensure_ascii=False)
+
+async def load_predictions_from_sheets() -> dict:
+    """Google Sheetsから予測データを取得"""
+    try:
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+            r = await client.get(GAS_URL)
+            data = r.json()
+            return data.get("predictions", {})
+    except Exception:
+        return load_predictions()
+
+async def save_predictions_to_sheets(date_str: str, companies: list):
+    """Google Sheetsに予測データを保存"""
+    try:
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+            await client.post(GAS_URL, json={"date": date_str, "companies": companies})
+    except Exception:
+        pass
+    # ローカルにも保存（バックアップ）
+    preds = load_predictions()
+    preds[date_str] = companies
+    save_predictions(preds)
 
 def next_bizday():
     import datetime as dt
@@ -75,30 +98,35 @@ def parse_stophigh(html: str) -> list:
     """株探のストップ高ページをパース（銘柄名を正しく取得）"""
     soup = BeautifulSoup(html, "html.parser")
     results = []
-    # 全trをスキャンして4桁コードのリンクがある行を探す
-    for row in soup.find_all("tr"):
-        cols = row.find_all(["td", "th"])
+    # 「銘柄名」ヘッダーを含むテーブルを探す
+    target_table = None
+    for table in soup.find_all("table"):
+        text = table.get_text()
+        if "銘柄名" in text and "コード" in text:
+            target_table = table
+            break
+    if not target_table:
+        return results
+    
+    for row in target_table.find_all("tr"):
+        cols = row.find_all("td")
         if len(cols) < 3:
             continue
-        # 1列目にコードのリンクがあるか確認
+        # コードのリンクを探す
         code_el = cols[0].find("a")
         if not code_el:
             continue
         ticker = re.sub(r"\D", "", code_el.get_text())
         if not re.match(r"^\d{4}$", ticker):
             continue
-        # 2列目が銘柄名、3列目が市場区分
-        name = cols[1].get_text(strip=True) if len(cols) > 1 else ""
-        market = cols[2].get_text(strip=True) if len(cols) > 2 else ""
-        # 市場区分が銘柄名になっていたらスキップ
-        if re.match(r"^[東名札福][PSGMENRＰＳＧＭＥＮＲ]", name):
-            continue
+        # 銘柄名のリンクを探す（2列目のaタグ）
+        name_el = cols[1].find("a")
+        name = name_el.get_text(strip=True) if name_el else cols[1].get_text(strip=True)
         price  = cols[4].get_text(strip=True) if len(cols) > 4 else ""
         change = cols[7].get_text(strip=True) if len(cols) > 7 else ""
         results.append({
             "ticker": ticker,
             "name": name,
-            "market": market,
             "price": price,
             "change": change,
         })
@@ -242,17 +270,18 @@ async def get_stophigh_after_earnings(days: int = 30):
 
 @app.post("/api/prediction/save")
 async def save_prediction(body: dict):
-    predictions = load_predictions()
     date_str = body.get("date")
     if not date_str:
         return {"error": "date required"}
-    predictions[date_str] = body.get("companies", [])
-    save_predictions(predictions)
-    return {"saved": len(predictions[date_str]), "date": date_str}
+    companies = body.get("companies", [])
+    await save_predictions_to_sheets(date_str, companies)
+    return {"saved": len(companies), "date": date_str}
 
 @app.get("/api/prediction/verify")
 async def verify_predictions(days: int = 30):
-    predictions = load_predictions()
+    predictions = await load_predictions_from_sheets()
+    if not predictions:
+        predictions = load_predictions()
     if not predictions:
         return {"results": [], "summary": {"total": 0, "hit": 0, "rate": 0}}
     today = date.today()
