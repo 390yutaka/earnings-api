@@ -113,9 +113,16 @@ def parse_stophigh(html: str) -> list:
         if not re.match(r"^\d{3,4}[A-Za-z]?$", ticker_raw):
             continue
         ticker = ticker_raw
-        # 2列目から銘柄名を取得（aタグあり・なし両方対応）
-        name_el = cols[1].find("a")
-        name = name_el.get_text(strip=True) if name_el else cols[1].get_text(strip=True)
+        # 銘柄名を取得（市場区分パターンを除外して正しい列を探す）
+        market_pattern = re.compile(r"^[東名札福][ＰＳＧＭＥＮＲPSGMENR]")
+        name = ""
+        for ci in [1, 2, 3]:
+            if ci >= len(cols):
+                break
+            candidate = cols[ci].get_text(strip=True)
+            if candidate and not market_pattern.match(candidate) and len(candidate) > 1:
+                name = candidate
+                break
         if not name:
             continue
         # 株価は5列目、前日比は8列目
