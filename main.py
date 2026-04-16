@@ -95,49 +95,42 @@ def parse_irbank(html: str, date_str: str) -> list:
     return results
 
 def parse_stophigh(html: str) -> list:
-    """株探のストップ高ページをパース - コードと株価のみ取得、名前は別途取得"""
+    """株探のストップ高ページをパース
+    デバッグで確認済み: table[2]がストップ高テーブル
+    row[0]はthヘッダー、row[1]以降がデータ
+    cols(th/td混在): [0]=コード [1]=銘柄名 [2]=市場 [3]="" [4]="" [5]=株価 [6]="" [7]=前日比
+    """
     soup = BeautifulSoup(html, "html.parser")
     results = []
-    # ヘッダー行のthを含むテーブルを探す
-    for table in soup.find_all("table"):
-        header = table.find("tr")
-        if not header:
+    tables = soup.find_all("table")
+    # 「銘柄名」を含むテーブルを探す
+    target = None
+    for t in tables:
+        if "銘柄名" in t.get_text() and "コード" in t.get_text():
+            target = t
+            break
+    if not target:
+        return results
+    rows = target.find_all("tr")
+    for row in rows[1:]:  # ヘッダー行をスキップ
+        cells = row.find_all(["td", "th"])
+        if len(cells) < 6:
             continue
-        header_text = header.get_text()
-        if "銘柄名" not in header_text and "コード" not in header_text:
+        code_el = cells[0].find("a")
+        if not code_el:
             continue
-        # このテーブルが銘柄テーブル
-        for row in table.find_all("tr")[1:]:
-            cells = row.find_all(["td", "th"])
-            if len(cells) < 5:
-                continue
-            code_el = cells[0].find("a")
-            if not code_el:
-                continue
-            ticker_raw = code_el.get_text(strip=True)
-            if not re.match(r"^\d{3,4}[A-Za-z]?$", ticker_raw):
-                continue
-            # cells[1]が銘柄名（th/tdどちらでも）
-            name = cells[1].get_text(strip=True)
-            # 市場区分っぽければcells[2]を試す
-            if re.match(r"^[東名札福].{1,2}$", name):
-                name = cells[2].get_text(strip=True) if len(cells) > 2 else ""
-            # 株価と変動率
-            price = ""
-            change = ""
-            for ci in range(len(cells)):
-                val = cells[ci].get_text(strip=True)
-                if re.match(r"^\d{1,3}(,\d{3})*$", val) and not price:
-                    price = val
-                if re.match(r"^[+-]\d+\.?\d*%$", val) and not change:
-                    change = val
-            results.append({
-                "ticker": ticker_raw,
-                "name": name,
-                "price": price,
-                "change": change,
-            })
-        break  # 最初に見つかったテーブルだけ処理
+        ticker = code_el.get_text(strip=True)
+        if not re.match(r"^\d{3,4}[A-Za-z]?$", ticker):
+            continue
+        name  = cells[1].get_text(strip=True)
+        price = cells[5].get_text(strip=True)
+        change = cells[7].get_text(strip=True) if len(cells) > 7 else ""
+        results.append({
+            "ticker": ticker,
+            "name": name,
+            "price": price,
+            "change": change,
+        })
     return results
 
 async def get_stock_change(ticker: str, target_date: str) -> dict:
