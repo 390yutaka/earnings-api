@@ -95,45 +95,49 @@ def parse_irbank(html: str, date_str: str) -> list:
     return results
 
 def parse_stophigh(html: str) -> list:
-    """株探のストップ高ページをパース
-    テーブル構造: cols[0]=コード, cols[1]=銘柄名(aタグ), cols[2]=市場区分
-    """
+    """株探のストップ高ページをパース - コードと株価のみ取得、名前は別途取得"""
     soup = BeautifulSoup(html, "html.parser")
     results = []
-    for row in soup.find_all("tr"):
-        cols = row.find_all("td")
-        if len(cols) < 5:
+    # ヘッダー行のthを含むテーブルを探す
+    for table in soup.find_all("table"):
+        header = table.find("tr")
+        if not header:
             continue
-        # 1列目にコードのリンクがあるか確認
-        code_el = cols[0].find("a")
-        if not code_el:
+        header_text = header.get_text()
+        if "銘柄名" not in header_text and "コード" not in header_text:
             continue
-        ticker_raw = code_el.get_text(strip=True)
-        # 4桁数字 または 3桁数字+英字（例: 278A）に対応
-        if not re.match(r"^\d{3,4}[A-Za-z]?$", ticker_raw):
-            continue
-        ticker = ticker_raw
-        # 銘柄名を取得（市場区分パターンを除外して正しい列を探す）
-        market_pattern = re.compile(r"^[東名札福][ＰＳＧＭＥＮＲPSGMENR]")
-        name = ""
-        for ci in [1, 2, 3]:
-            if ci >= len(cols):
-                break
-            candidate = cols[ci].get_text(strip=True)
-            if candidate and not market_pattern.match(candidate) and len(candidate) > 1:
-                name = candidate
-                break
-        if not name:
-            continue
-        # 株価は5列目、前日比は8列目
-        price  = cols[4].get_text(strip=True) if len(cols) > 4 else ""
-        change = cols[7].get_text(strip=True) if len(cols) > 7 else ""
-        results.append({
-            "ticker": ticker,
-            "name": name,
-            "price": price,
-            "change": change,
-        })
+        # このテーブルが銘柄テーブル
+        for row in table.find_all("tr")[1:]:
+            cells = row.find_all(["td", "th"])
+            if len(cells) < 5:
+                continue
+            code_el = cells[0].find("a")
+            if not code_el:
+                continue
+            ticker_raw = code_el.get_text(strip=True)
+            if not re.match(r"^\d{3,4}[A-Za-z]?$", ticker_raw):
+                continue
+            # cells[1]が銘柄名（th/tdどちらでも）
+            name = cells[1].get_text(strip=True)
+            # 市場区分っぽければcells[2]を試す
+            if re.match(r"^[東名札福].{1,2}$", name):
+                name = cells[2].get_text(strip=True) if len(cells) > 2 else ""
+            # 株価と変動率
+            price = ""
+            change = ""
+            for ci in range(len(cells)):
+                val = cells[ci].get_text(strip=True)
+                if re.match(r"^\d{1,3}(,\d{3})*$", val) and not price:
+                    price = val
+                if re.match(r"^[+-]\d+\.?\d*%$", val) and not change:
+                    change = val
+            results.append({
+                "ticker": ticker_raw,
+                "name": name,
+                "price": price,
+                "change": change,
+            })
+        break  # 最初に見つかったテーブルだけ処理
     return results
 
 async def get_stock_change(ticker: str, target_date: str) -> dict:
@@ -213,13 +217,19 @@ async def debug_stophigh():
         r = await client.get(url)
     soup = BeautifulSoup(r.text, "html.parser")
     result = []
+    # tdのみで確認（parse_stophighと同じ条件）
     for i, table in enumerate(soup.find_all("table")):
         rows = table.find_all("tr")
-        for j, row in enumerate(rows[:3]):
-            cols = row.find_all(["td", "th"])
+        for j, row in enumerate(rows[:4]):
+            cols = row.find_all("td")  # tdのみ
             if cols:
-                result.append({"table": i, "row": j, "cols": [c.get_text(strip=True)[:20] for c in cols[:8]]})
-    return {"rows": result[:20]}
+                result.append({
+                    "table": i, "row": j, 
+                    "td_count": len(cols),
+                    "cols": [c.get_text(strip=True)[:20] for c in cols[:8]],
+                    "has_a_in_col0": bool(cols[0].find("a")) if cols else False
+                })
+    return {"rows": result[:25]}
 
 @app.get("/api/stophigh/today")
 async def get_stophigh_today():
