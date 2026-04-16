@@ -108,9 +108,11 @@ def parse_stophigh(html: str) -> list:
         code_el = cols[0].find("a")
         if not code_el:
             continue
-        ticker = re.sub(r"\D", "", code_el.get_text())
-        if not re.match(r"^\d{4}$", ticker):
+        ticker_raw = code_el.get_text(strip=True)
+        # 4桁数字 または 3桁数字+英字（例: 278A）に対応
+        if not re.match(r"^\d{3,4}[A-Za-z]?$", ticker_raw):
             continue
+        ticker = ticker_raw
         # 2列目から銘柄名を取得（aタグあり・なし両方対応）
         name_el = cols[1].find("a")
         name = name_el.get_text(strip=True) if name_el else cols[1].get_text(strip=True)
