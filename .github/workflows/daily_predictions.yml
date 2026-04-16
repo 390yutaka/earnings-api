@@ -1,0 +1,96 @@
+name: Daily Predictions Save
+
+on:
+  schedule:
+    # 毎営業日 15:35 JST (06:35 UTC) に実行
+    - cron: '35 6 * * 1-5'
+  workflow_dispatch:  # 手動実行も可能
+
+jobs:
+  save-predictions:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Save today's predictions to Google Sheets
+        run: |
+          # Renderサーバーを起こす
+          curl -s https://earnings-api-y92s.onrender.com/ > /dev/null
+          sleep 10
+          
+          # 今日の日付（JST）
+          TODAY=$(TZ=Asia/Tokyo date +%Y-%m-%d)
+          echo "Today: $TODAY"
+          
+          # 当日の決算データを取得
+          DATA=$(curl -s "https://earnings-api-y92s.onrender.com/api/day?date_str=$TODAY")
+          echo "Data fetched"
+          
+          # GASに送信するためのPythonスクリプト
+          python3 << PYEOF
+          import json
+          import urllib.request
+          import os
+          
+          today = "$TODAY"
+          
+          # 決算データを取得
+          data = json.loads('''$DATA''')
+          companies_raw = data.get("companies", [])
+          
+          if not companies_raw:
+              print("No companies today")
+              exit(0)
+          
+          # スコア計算（簡易版）
+          def compute_score(c):
+              per = float(c.get("per", 0) or 0)
+              roe = float(c.get("roe", 0) or 0)
+              score = 0
+              upside = 0
+              
+              if per > 0:
+                  if per < 10: score += 40; upside += 30
+                  elif per < 15: score += 25; upside += 22
+                  elif per < 25: score += 5; upside += 12
+                  elif per < 40: score -= 5; upside += 5
+                  else: score -= 25
+              
+              if roe > 0:
+                  if roe >= 20: score += 30; upside += 20
+                  elif roe >= 15: score += 20; upside += 14
+                  elif roe >= 10: score += 10; upside += 8
+                  elif roe >= 5: upside += 3
+              
+              upside += 5  # ガイダンス未発表デフォルト
+              upside = min(100, max(0, upside))
+              
+              if score >= 60: verdict = "stop-high"; conf = min(92, 70+score*0.3)
+              elif score >= 30: verdict = "surge"; conf = min(85, 60+score*0.4)
+              elif score >= -15: verdict = "neutral"; conf = min(70, 50+abs(score)*0.3)
+              elif score >= -45: verdict = "fall"; conf = min(85, 55+abs(score)*0.4)
+              else: verdict = "stop-low"; conf = min(90, 60+abs(score)*0.3)
+              
+              return verdict, int(conf), upside
+          
+          companies = []
+          for c in companies_raw:
+              verdict, conf, upside = compute_score(c)
+              companies.append({
+                  "ticker": c["ticker"],
+                  "name": c["name"],
+                  "verdict": verdict,
+                  "upside": upside,
+                  "confidence": conf
+              })
+          
+          print(f"Computed scores for {len(companies)} companies")
+          
+          # GASに送信
+          GAS_URL = "https://script.google.com/macros/s/AKfycbxLejWYi8Z3HR9MJPz690hID-84tFq47s4sJIiC9QwcTVkzN9nxyIpDhMmvibEoLdFf/exec"
+          payload = json.dumps({"date": today, "companies": companies}).encode()
+          req = urllib.request.Request(GAS_URL, data=payload, headers={"Content-Type": "application/json"}, method="POST")
+          try:
+              with urllib.request.urlopen(req, timeout=30) as res:
+                  print("Saved:", res.read().decode())
+          except Exception as e:
+              print("Error:", e)
+          PYEOF
