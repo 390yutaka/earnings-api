@@ -95,33 +95,32 @@ def parse_irbank(html: str, date_str: str) -> list:
     return results
 
 def parse_stophigh(html: str) -> list:
-    """株探のストップ高ページをパース（銘柄名を正しく取得）"""
+    """株探のストップ高ページをパース
+    テーブル構造: cols[0]=コード, cols[1]=銘柄名(aタグ), cols[2]=市場区分
+    """
     soup = BeautifulSoup(html, "html.parser")
     results = []
-    # 「銘柄名」ヘッダーを含むテーブルを探す
-    target_table = None
-    for table in soup.find_all("table"):
-        text = table.get_text()
-        if "銘柄名" in text and "コード" in text:
-            target_table = table
-            break
-    if not target_table:
-        return results
-    
-    for row in target_table.find_all("tr"):
+    for row in soup.find_all("tr"):
         cols = row.find_all("td")
-        if len(cols) < 3:
+        if len(cols) < 5:
             continue
-        # コードのリンクを探す
+        # 1列目にコードのリンクがあるか確認
         code_el = cols[0].find("a")
         if not code_el:
             continue
         ticker = re.sub(r"\D", "", code_el.get_text())
         if not re.match(r"^\d{4}$", ticker):
             continue
-        # 銘柄名のリンクを探す（2列目のaタグ）
+        # 2列目のaタグから銘柄名を取得
         name_el = cols[1].find("a")
-        name = name_el.get_text(strip=True) if name_el else cols[1].get_text(strip=True)
+        if name_el:
+            name = name_el.get_text(strip=True)
+        else:
+            # aタグがない場合は市場区分でないか確認
+            name = cols[1].get_text(strip=True)
+            if re.match(r"^[東名札福].+", name) and len(name) <= 3:
+                continue  # 市場区分っぽいのでスキップ
+        # 株価は5列目、前日比は8列目
         price  = cols[4].get_text(strip=True) if len(cols) > 4 else ""
         change = cols[7].get_text(strip=True) if len(cols) > 7 else ""
         results.append({
