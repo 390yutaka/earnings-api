@@ -111,15 +111,11 @@ def parse_stophigh(html: str) -> list:
         ticker = re.sub(r"\D", "", code_el.get_text())
         if not re.match(r"^\d{4}$", ticker):
             continue
-        # 2列目のaタグから銘柄名を取得
+        # 2列目から銘柄名を取得（aタグあり・なし両方対応）
         name_el = cols[1].find("a")
-        if name_el:
-            name = name_el.get_text(strip=True)
-        else:
-            # aタグがない場合は市場区分でないか確認
-            name = cols[1].get_text(strip=True)
-            if re.match(r"^[東名札福].+", name) and len(name) <= 3:
-                continue  # 市場区分っぽいのでスキップ
+        name = name_el.get_text(strip=True) if name_el else cols[1].get_text(strip=True)
+        if not name:
+            continue
         # 株価は5列目、前日比は8列目
         price  = cols[4].get_text(strip=True) if len(cols) > 4 else ""
         change = cols[7].get_text(strip=True) if len(cols) > 7 else ""
