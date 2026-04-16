@@ -852,17 +852,22 @@ function getStage(pct){
   return            {label:"S安",  color:"#ff3355"};
 }
 
-// ── 予測自動保存 ──
+// ── 予測自動保存（Google Sheetsに直接保存）──
+const GAS_URL = "https://script.google.com/macros/s/AKfycbxLejWYi8Z3HR9MJPz690hID-84tFq47s4sJIiC9QwcTVkzN9nxyIpDhMmvibEoLdFf/exec";
 async function savePredictions(date_str, companies){
   try{
-    await fetch(BACKEND+"/api/prediction/save",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({
-        date:date_str,
-        companies:companies.map(c=>({ticker:c.ticker,name:c.name,verdict:c.verdict,upside:c.upside,confidence:c.confidence}))
-      })
+    const payload = {
+      date: date_str,
+      companies: companies.map(c=>({ticker:c.ticker,name:c.name,verdict:c.verdict,upside:c.upside,confidence:c.confidence}))
+    };
+    // no-corsで送信（GASはCORSを返さないため）
+    await fetch(GAS_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify(payload)
     });
+    console.log("予測保存OK:", date_str, companies.length+"社");
   }catch(e){console.log("予測保存エラー:",e);}
 }
 
@@ -871,7 +876,65 @@ async function loadAccuracy(){
   const el=document.getElementById("accuracy-content");
   el.innerHTML='<div class="status-box"><div class="spin"></div><div style="font-size:12px;color:#4a6070;margin-top:12px;">的中率を計算中...</div><div style="font-size:10px;color:#2a3a4a;margin-top:4px;">株価データを取得しています</div></div>';
   try{
-    const data=await apiGet("/api/prediction/verify?days=30");
+    // Google Sheetsから予測データを取得してフロントで照合
+    const gasRes = await fetch("https://script.google.com/macros/s/AKfycbxLejWYi8Z3HR9MJPz690hID-84tFq47s4sJIiC9QwcTVkzN9nxyIpDhMmvibEoLdFf/exec");
+    const gasData = await gasRes.json();
+    const predictions = gasData.predictions || {};
+    
+    // 予測データを株価と照合
+    const today = new Date();
+    const results = [];
+    for(const [date_str, companies] of Object.entries(predictions)){
+      const predDate = new Date(date_str);
+      const nextD = new Date(predDate);
+      nextD.setDate(nextD.getDate()+1);
+      while(nextD.getDay()===0||nextD.getDay()===6) nextD.setDate(nextD.getDate()+1);
+      if(nextD > today) continue;
+      const nextStr = nextD.toISOString().slice(0,10);
+      for(const c of companies){
+        try{
+          const yr = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${c.ticker}.T?interval=1d&range=10d`);
+          const yd = await yr.json();
+          const timestamps = yd.chart.result[0].timestamp;
+          const closes = yd.chart.result[0].indicators.quote[0].close;
+          const opens = yd.chart.result[0].indicators.quote[0].open;
+          let change_pct = null, open_p = null, close_p = null;
+          for(let i=0;i<timestamps.length;i++){
+            const d = new Date(timestamps[i]*1000).toISOString().slice(0,10);
+            if(d===nextStr && closes[i] && opens[i]){
+              change_pct = Math.round((closes[i]-opens[i])/opens[i]*10000)/100;
+              open_p = Math.round(opens[i]*10)/10;
+              close_p = Math.round(closes[i]*10)/10;
+              break;
+            }
+          }
+          if(change_pct===null) continue;
+          const hit_map = {
+            "stop-high": x=>x>=15, "surge": x=>x>=3,
+            "neutral": x=>x>=-3&&x<=3, "fall": x=>x<=-3, "stop-low": x=>x<=-15
+          };
+          const checker = hit_map[c.verdict];
+          const is_hit = checker ? checker(change_pct) : false;
+          results.push({ticker:c.ticker, name:c.name, earnings_date:date_str, check_date:nextStr,
+            verdict:c.verdict, upside:c.upside, change_pct, is_hit, open:open_p, close:close_p});
+        }catch(e){}
+      }
+    }
+    const total = results.length;
+    const hit = results.filter(r=>r.is_hit).length;
+    const rate = total>0?Math.round(hit/total*1000)/10:0;
+    const high = results.filter(r=>r.upside>=70);
+    const mid = results.filter(r=>r.upside>=40&&r.upside<70);
+    const low = results.filter(r=>r.upside<40);
+    const cr = lst=>lst.length>0?Math.round(lst.filter(r=>r.is_hit).length/lst.length*1000)/10:0;
+    const data = {
+      results: results.sort((a,b)=>b.earnings_date.localeCompare(a.earnings_date)),
+      summary: {total,hit,rate,by_upside:{
+        high_70plus:{count:high.length,rate:cr(high)},
+        mid_40_70:{count:mid.length,rate:cr(mid)},
+        low_under40:{count:low.length,rate:cr(low)}
+      }}
+    };
     const {results,summary}=data;
     if(!results||results.length===0){
       el.innerHTML='<div class="status-box"><div style="font-size:28px;margin-bottom:10px;">📊</div><div style="font-size:13px;color:#c8d8e8;margin-bottom:8px;">まだ検証できるデータがありません</div><div style="font-size:11px;color:#4a6070;">翌営業日以降に的中率が表示されます</div></div>';
