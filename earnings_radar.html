@@ -241,10 +241,22 @@ function computeScore(c){
     else if(roe >= 10) upside += 8;
     else if(roe >= 5)  upside += 3;
   }
-  upside += Math.min(20, capBonus * 1.5);
-  const gdUp = {"大幅上方修正":20,"上方修正":14,"据え置き":5,"下方修正":0,"未発表":5};
+  // 小型株ボーナス縮小（最大10点）
+  upside += Math.min(10, capBonus * 0.75);
+  // ガイダンス拡大（最大25点）
+  const gdUp = {"大幅上方修正":25,"上方修正":18,"据え置き":5,"下方修正":0,"未発表":5};
   upside += gdUp[c.guidance] || 5;
-  if(c.decision_type && c.decision_type.includes("本決算")) upside += 5;
+  // 本決算ボーナス拡大（10点）
+  if(c.decision_type && c.decision_type.includes("本決算")) upside += 10;
+  // 増収率ボーナス（最大15点）
+  if(c.rev_surprise !== null && c.rev_surprise !== undefined){
+    if(c.rev_surprise >= 20)      upside += 15;
+    else if(c.rev_surprise >= 10) upside += 10;
+    else if(c.rev_surprise >= 5)  upside += 6;
+    else if(c.rev_surprise >= 0)  upside += 2;
+    else if(c.rev_surprise >= -5) upside -= 3;
+    else                          upside -= 8;
+  }
   upside = Math.min(100, Math.max(0, Math.round(upside)));
 
   // 上昇期待度の根拠
@@ -268,12 +280,16 @@ function computeScore(c){
     upsideBreakdown.push({label:"小型株ボーナス", point:Math.min(20,capBonus*1.5), color:"#88ffcc"});
   }
   const gdUpLabel = {"大幅上方修正":"ガイダンス大幅上方","上方修正":"ガイダンス上方","据え置き":"ガイダンス据置","下方修正":"ガイダンス下方","未発表":"ガイダンス未発表"};
-  const gdUpPt = {"大幅上方修正":20,"上方修正":14,"据え置き":5,"下方修正":0,"未発表":5};
+  const gdUpPt = {"大幅上方修正":25,"上方修正":18,"据え置き":5,"下方修正":0,"未発表":5};
   if(c.guidance && gdUpLabel[c.guidance]){
     upsideBreakdown.push({label:gdUpLabel[c.guidance], point:gdUpPt[c.guidance]||0, color:c.guidance==="下方修正"?"#ff3355":c.guidance==="上方修正"||c.guidance==="大幅上方修正"?"#00ff88":"#ffd700"});
   }
   if(c.decision_type && c.decision_type.includes("本決算")){
-    upsideBreakdown.push({label:"本決算ボーナス", point:5, color:"#88ffcc"});
+    upsideBreakdown.push({label:"本決算ボーナス", point:10, color:"#88ffcc"});
+  }
+  if(c.rev_surprise !== null && c.rev_surprise !== undefined){
+    const rsPt = c.rev_surprise>=20?15:c.rev_surprise>=10?10:c.rev_surprise>=5?6:c.rev_surprise>=0?2:c.rev_surprise>=-5?-3:-8;
+    upsideBreakdown.push({label:`増収率 ${c.rev_surprise}%`, point:rsPt, color:rsPt>=6?"#00ff88":rsPt>=0?"#ffd700":"#ff9966"});
   }
 
   return{verdict:v, confidence:Math.round(conf), upside, upsideBreakdown};
