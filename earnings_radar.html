@@ -927,16 +927,18 @@ async function loadAccuracy(){
     const mid = results.filter(r=>r.upside>=40&&r.upside<70);
     const low = results.filter(r=>r.upside<40);
     const cr = lst=>lst.length>0?Math.round(lst.filter(r=>r.is_hit).length/lst.length*1000)/10:0;
+    const sortedResults = results.sort((a,b)=>b.earnings_date.localeCompare(a.earnings_date));
     const data = {
-      results: results.sort((a,b)=>b.earnings_date.localeCompare(a.earnings_date)),
+      results: sortedResults,
       summary: {total,hit,rate,by_upside:{
         high_70plus:{count:high.length,rate:cr(high)},
         mid_40_70:{count:mid.length,rate:cr(mid)},
         low_under40:{count:low.length,rate:cr(low)}
       }}
     };
-    const {results,summary}=data;
-    if(!results||results.length===0){
+    const {results:resultsList,summary}=data;
+    const results2=resultsList;
+    if(!results2||results2.length===0){
       el.innerHTML='<div class="status-box"><div style="font-size:28px;margin-bottom:10px;">📊</div><div style="font-size:13px;color:#c8d8e8;margin-bottom:8px;">まだ検証できるデータがありません</div><div style="font-size:11px;color:#4a6070;">翌営業日以降に的中率が表示されます</div></div>';
       return;
     }
@@ -974,7 +976,7 @@ async function loadAccuracy(){
       h+=`<th style="padding:10px 14px;text-align:left;font-size:9px;letter-spacing:2px;color:#4a6070;text-transform:uppercase;border-bottom:1px solid #1e2d3d;font-weight:400;">${th}</th>`;
     }
     h+=`</tr></thead><tbody>`;
-    results.forEach((r,i)=>{
+    results2.forEach((r,i)=>{
       const vc=VC[r.verdict]||"#888";
       const stage=getStage(r.change_pct);
       const upsideColor=r.upside>=70?"#00ff88":r.upside>=40?"#ffd700":"#ff9966";
